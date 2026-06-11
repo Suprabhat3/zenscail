@@ -75,7 +75,7 @@ export function Demo() {
         <span className="dot-tl" />
         <span className="dot-tl" />
         <span className="dot-tl" />
-        <span className="demo-addr">zenscail.app</span>
+        <span className="demo-addr">zenscail.com</span>
         <span className="demo-hint">
           <SparkIcon />
           <span>Interactive — everything is clickable</span>
@@ -182,6 +182,7 @@ export function Demo() {
               <h3>This week</h3>
               <span>April 6 – 10</span>
             </div>
+            <div className="cal-scroll">
             <div className="cal-grid">
               <span className="cg-corner" />
               <span className="cg-day">Mon 6</span>
@@ -225,6 +226,7 @@ export function Demo() {
               <span className="cg-cell"><span className="cal-event ce-rose">1:1 with Sam · 2:30</span></span>
               <span className="cg-cell" />
               <span className="cg-cell" />
+            </div>
             </div>
             <p className="cal-foot">
               <svg width="15" height="15" viewBox="0 0 13 13" aria-hidden="true">
