@@ -1,0 +1,59 @@
+# Corsair
+
+> Corsair lets your app integrate with hundreds of services (Gmail, Slack, GitHub, Linear, Google Calendar, and more). Use it from coding agents over MCP, from agent SDKs in your backend, or with direct API execution.
+
+## Get started (Corsair App)
+
+- [Agent setup](https://docs.corsair.dev/app/agent-setup.md): **Start here for coding agents** — clarify intent, provision instance/plugins/tenant via SDK, ask when ambiguous.
+- [Introduction](https://docs.corsair.dev/app/home.md): What Corsair is, agentic vs deterministic usage, and install `@corsair-dev/app` (humans).
+
+### Use Corsair in chat (MCP)
+
+Give Cursor, Claude Code, Codex, or any MCP client a tenant-scoped HTTP endpoint.
+
+- [Coding agents overview](https://docs.corsair.dev/app/coding-agents.md): Hosted MCP for agents — get URL + bearer token from the dashboard.
+- [Cursor](https://docs.corsair.dev/app/coding-agents/cursor.md): `.cursor/mcp.json` with URL and Authorization header.
+- [Claude Code](https://docs.corsair.dev/app/coding-agents/claude-code.md): `.mcp.json` or `claude mcp add --transport http`.
+- [Codex](https://docs.corsair.dev/app/coding-agents/codex.md): Streamable HTTP in Codex UI, CLI, or `~/.codex/config.toml`.
+- [Antigravity](https://docs.corsair.dev/app/coding-agents/antigravity.md): `~/.gemini/antigravity/mcp_config.json` with `serverUrl`.
+- [Custom connector](https://docs.corsair.dev/app/coding-agents/custom-connector.md): Any HTTP MCP client — URL + bearer token.
+
+### Use Corsair in agent SDKs
+
+Wire Corsair into Vercel AI SDK, OpenAI, or Claude Agent SDK from your backend.
+
+- [Agent SDKs overview](https://docs.corsair.dev/app/agent-sdks.md): MCP tools in harnesses via `tenant.mcp.createVercelClient()` or tenant MCP keys.
+- [Vercel AI SDK](https://docs.corsair.dev/app/vercel-ai.md): `streamText` / `generateText` with `createVercelClient` or `createVercelAiMcpClient`.
+- [OpenAI](https://docs.corsair.dev/app/openai.md): Responses API and OpenAI Agents SDK with `getOpenAiMcpConfig` / `createOpenAiMcpServer`.
+- [Claude Agent SDK](https://docs.corsair.dev/app/claude.md): `claudeMcpServerConfig` and `query()`.
+
+### Use Corsair in your UI (direct execution)
+
+Call plugin operations from your backend without an agent loop. **Read feeds from `*.db.*`; refresh with `*.api.*`.**
+
+- [Direct execution](https://docs.corsair.dev/app/direct-execution.md): `tenant.run()` — API vs DB paths, Resync pattern, writes, UI actions.
+
+### Provision and manage (@corsair-dev/app)
+
+Provision via the SDK after the user creates a developer API key at [app.corsair.dev/api-keys](https://app.corsair.dev/api-keys). After setup, call `t.connectLink.create()` and send the URL to the user.
+
+- [Installation](https://docs.corsair.dev/app/installation.md): Install `@corsair-dev/app` and minimal provisioning.
+- [Instances and plugins](https://docs.corsair.dev/app/instances-and-plugins.md): Create instances, install plugins, permissions, root credentials.
+- [Tenants and auth](https://docs.corsair.dev/app/tenants-and-auth.md): Tenants, connect links, API keys, OAuth per customer.
+- [Types and errors](https://docs.corsair.dev/app/types-and-errors.md): Generated types, Zod schemas, `CorsairApiError`.
+
+## Integrations catalog
+
+Full list of available plugins and operations.
+
+- [Integrations](https://api.corsair.dev/md/integrations): Complete Corsair integration catalog (Markdown).
+
+## Self-hosted SDK (optional)
+
+Run Corsair in your own process with the open-source SDK — local MCP, plugins, and database sync.
+
+- [SDK introduction](https://docs.corsair.dev/getting-started/introduction.md): Self-hosted Corsair overview.
+- [SDK quick start](https://docs.corsair.dev/getting-started/quick-start.md): Local setup.
+- [SDK installation](https://docs.corsair.dev/getting-started/installation.md): Install packages.
+- [Plugins guide](https://docs.corsair.dev/guides/plugins.md): Self-hosted plugin catalog.
+- [MCP adapters](https://docs.corsair.dev/mcp-adapters/mcp-adapters.md): Local stdio MCP for coding agents (not hosted App).
