@@ -1,6 +1,6 @@
-﻿/* ============================================================
-   ZenScail â€” warm minimal landing
-   Cream paper Â· warm ink Â· rose accent Â· editorial serif
+/* ============================================================
+   ZenScail — warm minimal landing
+   Cream paper · warm ink · rose accent · editorial serif
    ============================================================ */
 
 :root {
@@ -18,9 +18,12 @@
   --accent-tint: #F9DFE5;
   --gold: #C98A2D;
   --sage: #6E7F5E;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-body: "Schibsted Grotesk", "Helvetica Neue", sans-serif;
   --radius: 16px;
   --shadow-card: 0 1px 2px rgba(60, 45, 20, 0.05), 0 12px 32px -12px rgba(60, 45, 20, 0.18);
   --shadow-float: 0 2px 4px rgba(60, 45, 20, 0.06), 0 24px 48px -16px rgba(60, 45, 20, 0.25);
+  --motion: 1;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -236,39 +239,15 @@ button { font-family: inherit; cursor: pointer; }
 .waitlist-success {
   margin-top: 36px;
   display: none;
-  align-items: flex-start;
-  text-align: left;
-  gap: 14px;
-  background: #EFF4E8;
-  border: 1.5px solid #CBD8BC;
-  color: #44532F;
-  padding: 18px 22px;
-  border-radius: 18px;
+  align-items: center;
+  gap: 12px;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--accent-tint);
+  color: var(--accent-deep);
+  font-weight: 600;
+  padding: 14px 22px;
+  border-radius: 99px;
   max-width: 460px;
-  box-shadow: 0 10px 28px -14px rgba(110, 127, 94, 0.45);
-  animation: success-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-}
-.waitlist-success svg { flex-shrink: 0; margin-top: 1px; }
-.waitlist-success strong {
-  display: block;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 20px;
-  line-height: 1.25;
-  color: #36421F;
-}
-.waitlist-success p {
-  margin-top: 5px;
-  font-size: 14.5px;
-  line-height: 1.55;
-  color: #5C6B45;
-}
-@keyframes success-pop {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
-  to { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .waitlist-success { animation: none; }
 }
 .waitlist-wrap.joined .waitlist,
 .waitlist-wrap.joined .waitlist-note { display: none; }
@@ -986,46 +965,6 @@ section[data-screen-label] { position: relative; }
   border-radius: 99px;
   padding: 5px 13px;
 }
-.privacy-callout {
-  margin: 40px auto 0;
-  max-width: 780px;
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  background: var(--paper);
-  border: 1.5px solid #CBD8BC;
-  border-radius: 20px;
-  padding: 26px 30px;
-  box-shadow: 0 12px 32px -18px rgba(110, 127, 94, 0.4);
-}
-.privacy-callout .pc-lock {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: var(--sage);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.privacy-callout h3 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 22px;
-  letter-spacing: -0.01em;
-}
-.privacy-callout p {
-  margin-top: 7px;
-  font-size: 15px;
-  line-height: 1.65;
-  color: var(--ink-soft);
-  text-wrap: pretty;
-}
-.privacy-callout strong { color: var(--sage); font-weight: 700; }
-@media (max-width: 640px) {
-  .privacy-callout { flex-direction: column; padding: 24px; }
-}
-
 .pricing-note {
   text-align: center;
   margin-top: 28px;
@@ -1057,28 +996,6 @@ section[data-screen-label] { position: relative; }
 }
 .footer .logo { font-size: 22px; }
 .footer-tag { margin-top: 12px; font-size: 14px; color: var(--muted); max-width: 240px; line-height: 1.6; }
-.footer-social {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
-}
-.footer-social a {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s, border-color 0.15s, transform 0.15s;
-}
-.footer-social a:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
 .footer h4 {
   font-size: 12.5px;
   font-weight: 700;

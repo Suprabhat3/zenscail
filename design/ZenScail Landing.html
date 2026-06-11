@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZenScail — Your inbox and calendar, finally at peace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="zenscail.css" />
+</head>
+<body>
+
+<!-- ======================= NAV ======================= -->
+<nav class="nav" data-screen-label="Nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="#top">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+        <path d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15" fill="none" stroke="var(--ink)" stroke-width="2.6" stroke-linecap="round"></path>
+        <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)"></circle>
+      </svg>
+      <span>ZenScail</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#demo">See it work</a>
+      <a href="#pricing">Pricing</a>
+    </div>
+    <a class="btn btn-primary btn-sm" href="#join">Join the waitlist</a>
+  </div>
+</nav>
+
+<!-- ======================= HERO ======================= -->
+<header class="hero" id="top" data-screen-label="Hero">
+  <div class="hero-horizon" aria-hidden="true">
+    <svg width="100%" height="100%" viewBox="0 0 1400 760" preserveAspectRatio="xMidYMax slice">
+      <circle cx="1050" cy="780" r="520" fill="none" stroke="var(--line)" stroke-width="1.5"></circle>
+      <circle cx="1050" cy="780" r="640" fill="none" stroke="var(--line-soft)" stroke-width="1.5"></circle>
+      <circle cx="1050" cy="780" r="400" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="2 10" stroke-linecap="round"></circle>
+      <circle cx="1050" cy="780" r="760" fill="none" stroke="var(--line-soft)" stroke-width="1.5"></circle>
+    </svg>
+  </div>
+  <div class="wrap hero-grid">
+    <div class="reveal in-view">
+      <span class="eyebrow">Email + calendar + AI</span>
+      <h1 class="display" style="margin-top: 20px;">
+        Your day,<br />
+        already <span class="underline-word"><em>sorted.</em>
+          <svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M 4 9 Q 50 3 100 8 T 196 7"></path>
+          </svg>
+        </span>
+      </h1>
+      <p class="lede">ZenScail reads your inbox and calendar so you don&rsquo;t have to. Every morning, one calm brief: what matters, what can wait, and what&rsquo;s already handled for you.</p>
+      <div class="waitlist-wrap">
+        <form class="waitlist">
+          <input type="email" placeholder="you@work.com" aria-label="Email address" />
+          <button class="btn btn-accent" type="submit">Join the waitlist</button>
+        </form>
+        <p class="waitlist-note">
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span>Free forever with your own API keys. No spam, ever.</span>
+        </p>
+        <div class="waitlist-success">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="var(--accent)"></circle><path d="M 5 9.5 L 8 12.5 L 13 6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span>You&rsquo;re on the list — see you at sunrise.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hv-card hv-cal float">
+        <div class="hv-cal-month"><span>April</span><span>2026</span></div>
+        <div class="hv-cal-days">
+          <span class="dim">M</span><span class="dim">T</span><span class="dim">W</span><span class="dim">T</span><span class="dim">F</span><span class="dim">S</span><span class="dim">S</span>
+          <span>6</span><span class="dot">7</span><span class="today">8</span><span class="dot">9</span><span>10</span><span class="dim">11</span><span class="dim">12</span>
+          <span class="dot">13</span><span>14</span><span>15</span><span class="dot">16</span><span>17</span><span class="dim">18</span><span class="dim">19</span>
+        </div>
+      </div>
+
+      <div class="hv-card hv-brief">
+        <div class="hv-head">
+          <svg class="hv-sun" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+            <circle cx="17" cy="17" r="16" fill="var(--accent-soft)"></circle>
+            <circle cx="17" cy="20" r="6" fill="var(--accent)"></circle>
+            <path d="M 7 24 H 27" stroke="var(--accent-deep)" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+          <div>
+            <strong>Your morning brief</strong>
+            <span>Wednesday, April 8 · 7:00 AM</span>
+          </div>
+        </div>
+        <p class="hv-brief-body" id="hero-brief-typed"></p>
+      </div>
+
+      <div class="hv-card hv-event float float-b">
+        <span class="hv-event-bar"></span>
+        <div>
+          <strong>1:1 with Sam</strong>
+          <span>Moved to 2:30 PM — you said yes</span>
+        </div>
+      </div>
+
+      <div class="hv-reminder float float-c">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M 8 2 C 5.5 2 4 4 4 6.5 V 10 L 2.5 12 H 13.5 L 12 10 V 6.5 C 12 4 10.5 2 8 2 Z" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linejoin="round"></path>
+          <path d="M 6.5 13.5 A 1.8 1.8 0 0 0 9.5 13.5" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round"></path>
+        </svg>
+        <span>Nudge: Priya&rsquo;s contract — reply before Friday</span>
+      </div>
+
+      <div class="hv-card hv-reply float">
+        <span class="hv-reply-label">
+          <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true"><path d="M 6.5 0.5 L 7.8 4.7 L 12 6 L 7.8 7.3 L 6.5 11.5 L 5.2 7.3 L 1 6 L 5.2 4.7 Z" fill="var(--accent)"></path></svg>
+          <span>Draft ready</span>
+        </span>
+        <p>&ldquo;Hi Priya — terms look good on our side. I&rsquo;ll sign today so we&rsquo;re ahead of Friday&hellip;&rdquo;</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= DAILY BRIEF SHOWCASE ======================= -->
+<section class="section" id="features" data-screen-label="Daily Brief">
+  <div class="wrap">
+    <div class="brief-stage reveal">
+      <svg class="brief-sky" viewBox="0 0 1100 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <circle cx="930" cy="90" r="3" fill="#C98A2D" opacity="0.8"></circle>
+        <circle cx="1010" cy="170" r="2" fill="#C98A2D" opacity="0.5"></circle>
+        <circle cx="860" cy="40" r="2" fill="#FAF5EC" opacity="0.4"></circle>
+        <circle cx="980" cy="300" r="2.5" fill="#FAF5EC" opacity="0.3"></circle>
+        <circle cx="80" cy="440" r="2" fill="#C98A2D" opacity="0.5"></circle>
+        <path d="M -40 530 A 560 560 0 0 1 520 620" fill="none" stroke="#C98A2D" stroke-width="1" opacity="0.4"></path>
+      </svg>
+      <div>
+        <span class="eyebrow">The daily brief</span>
+        <h2 class="display" style="margin-top: 16px;">Open ZenScail.<br />Read one thing.<br /><em>Know your whole day.</em></h2>
+        <p class="lede">Every morning at 7, ZenScail reads overnight email, checks today&rsquo;s calendar, and writes you a brief a good chief of staff would be proud of. Meetings, must-replies, gentle nudges — all in thirty seconds of reading.</p>
+      </div>
+      <div class="brief-card reveal reveal-d1">
+        <div class="brief-card-head">
+          <h3>Wednesday, April 8</h3>
+          <time>7:00 AM brief</time>
+        </div>
+        <ul class="brief-items">
+          <li><span class="bi-time">First</span><span><strong>Reply to Priya</strong> — contract renewal needs your sign-off by Friday. A draft is ready.</span></li>
+          <li><span class="bi-time">9:30 AM</span><span><strong>Design review</strong> with the product team. Figma file attached to the invite.</span></li>
+          <li><span class="bi-time">2:30 PM</span><span><strong>1:1 with Sam</strong> — moved from noon. He wants to talk Q2 roadmap.</span></li>
+          <li><span class="bi-time">Heads up</span><span>Atlas Studio&rsquo;s invoice is due next week — <strong>one tap to confirm</strong> receipt.</span></li>
+          <li><span class="bi-time">Quiet</span><span>Your afternoon after 3 is clear. Protected it for deep work.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FEATURES ======================= -->
+<section class="section" style="padding-top: 40px;" data-screen-label="Features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">What it does</span>
+      <h2 class="display">Less inbox.<br />More <em>actual work.</em></h2>
+    </div>
+
+    <div class="features-grid">
+      <!-- Email summarization -->
+      <div class="feature-card reveal">
+        <div class="fc-art vignette" aria-hidden="true">
+          <svg viewBox="0 0 220 120">
+            <rect x="24" y="22" width="80" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="24" y="35" width="92" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="24" y="48" width="70" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="24" y="61" width="86" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="24" y="74" width="60" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="24" y="87" width="78" height="5" rx="2.5" class="fill-soft"></rect>
+            <path d="M 124 58 H 144 M 138 51 L 145 58 L 138 65" class="stroke-accent"></path>
+            <circle cx="160" cy="40" r="3" class="fill-accent"></circle>
+            <rect x="170" y="37" width="30" height="5" rx="2.5" fill="var(--ink-soft)"></rect>
+            <circle cx="160" cy="59" r="3" class="fill-accent"></circle>
+            <rect x="170" y="56" width="24" height="5" rx="2.5" fill="var(--ink-soft)"></rect>
+            <circle cx="160" cy="78" r="3" class="fill-accent"></circle>
+            <rect x="170" y="75" width="27" height="5" rx="2.5" fill="var(--ink-soft)"></rect>
+          </svg>
+        </div>
+        <h3>Threads, condensed</h3>
+        <p>A 40-message thread becomes three honest bullet points. Read what was decided, not who said &ldquo;sounds good.&rdquo;</p>
+      </div>
+
+      <!-- Smart reminders -->
+      <div class="feature-card reveal reveal-d1">
+        <div class="fc-art vignette" aria-hidden="true">
+          <svg viewBox="0 0 220 120">
+            <circle cx="110" cy="60" r="34" fill="none" stroke="var(--accent)" stroke-width="1.2" opacity="0.35">
+              <animate attributeName="r" values="30;44" dur="2.6s" repeatCount="indefinite"></animate>
+              <animate attributeName="opacity" values="0.4;0" dur="2.6s" repeatCount="indefinite"></animate>
+            </circle>
+            <circle cx="110" cy="60" r="34" fill="none" stroke="var(--accent)" stroke-width="1.2" opacity="0.35">
+              <animate attributeName="r" values="30;44" dur="2.6s" begin="1.3s" repeatCount="indefinite"></animate>
+              <animate attributeName="opacity" values="0.4;0" dur="2.6s" begin="1.3s" repeatCount="indefinite"></animate>
+            </circle>
+            <path d="M 110 38 C 99 38 93 46 93 56 V 70 L 87 78 H 133 L 127 70 V 56 C 127 46 121 38 110 38 Z" class="stroke" stroke-width="2.2" fill="var(--paper)"></path>
+            <path d="M 103 84 A 7 7 0 0 0 117 84" class="stroke" stroke-width="2.2"></path>
+            <circle cx="129" cy="40" r="6" class="fill-accent"></circle>
+          </svg>
+        </div>
+        <h3>Reminders that think</h3>
+        <p>Not &ldquo;you have mail&rdquo; — but &ldquo;Priya needs an answer by Friday, and Friday is tomorrow.&rdquo; Nudges only when they matter.</p>
+      </div>
+
+      <!-- AI reply drafting -->
+      <div class="feature-card reveal reveal-d2">
+        <div class="fc-art vignette" aria-hidden="true">
+          <svg viewBox="0 0 220 120">
+            <rect x="36" y="30" width="120" height="60" rx="12" fill="var(--paper)" stroke="var(--line)" stroke-width="1.5"></rect>
+            <rect x="50" y="46" width="74" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="50" y="59" width="90" height="5" rx="2.5" class="fill-soft"></rect>
+            <rect x="50" y="72" width="56" height="5" rx="2.5" class="fill-soft"></rect>
+            <path d="M 156 84 L 176 64 L 184 72 L 164 92 L 153 95 Z" class="fill-accent"></path>
+            <path d="M 168 22 L 170.4 29.6 L 178 32 L 170.4 34.4 L 168 42 L 165.6 34.4 L 158 32 L 165.6 29.6 Z" fill="var(--gold)">
+              <animateTransform attributeName="transform" type="rotate" values="0 168 32; 18 168 32; 0 168 32" dur="3.4s" repeatCount="indefinite"></animateTransform>
+            </path>
+          </svg>
+        </div>
+        <h3>Replies in your voice</h3>
+        <p>ZenScail learns how you write — warm, brief, no exclamation marks — and drafts replies you&rsquo;d actually send. You just tap.</p>
+      </div>
+
+      <!-- Unified inbox + calendar (wide) -->
+      <div class="feature-card feature-wide reveal">
+        <div class="fc-art vignette" aria-hidden="true">
+          <svg viewBox="0 0 300 150">
+            <rect x="34" y="38" width="104" height="74" rx="10" fill="var(--paper)" stroke="var(--line)" stroke-width="1.5"></rect>
+            <path d="M 34 48 L 86 80 L 138 48" fill="none" stroke="var(--ink-soft)" stroke-width="1.8" stroke-linejoin="round"></path>
+            <rect x="162" y="38" width="104" height="74" rx="10" fill="var(--paper)" stroke="var(--line)" stroke-width="1.5"></rect>
+            <path d="M 162 58 H 266" stroke="var(--line)" stroke-width="1.5"></path>
+            <rect x="172" y="68" width="22" height="12" rx="4" class="fill-soft"></rect>
+            <rect x="200" y="68" width="22" height="12" rx="4" fill="var(--accent-tint)"></rect>
+            <rect x="228" y="86" width="22" height="12" rx="4" class="fill-soft"></rect>
+            <path d="M 138 75 H 162" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 5" stroke-linecap="round">
+              <animate attributeName="stroke-dashoffset" values="18;0" dur="1.4s" repeatCount="indefinite"></animate>
+            </path>
+            <circle cx="150" cy="75" r="9" class="fill-accent"></circle>
+            <path d="M 146.5 75 L 149 77.5 L 153.5 72.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+        <div class="fc-copy">
+          <h3>One place, not five tabs</h3>
+          <p>Inbox and calendar live side by side and talk to each other. An email about a meeting shows the meeting. A meeting with an agenda shows the thread. No more cross-referencing yourself.</p>
+        </div>
+      </div>
+
+      <!-- Smart scheduling -->
+      <div class="feature-card reveal reveal-d1">
+        <div class="fc-art vignette" aria-hidden="true">
+          <svg viewBox="0 0 220 120">
+            <rect x="40" y="24" width="140" height="76" rx="10" fill="var(--paper)" stroke="var(--line)" stroke-width="1.5"></rect>
+            <path d="M 40 42 H 180 M 75 42 V 100 M 110 42 V 100 M 145 42 V 100" stroke="var(--line-soft)" stroke-width="1.5"></path>
+            <rect x="46" y="50" width="24" height="16" rx="4" class="fill-soft"></rect>
+            <rect x="81" y="68" width="24" height="22" rx="4" class="fill-soft"></rect>
+            <rect x="151" y="50" width="24" height="16" rx="4" class="fill-soft"></rect>
+            <rect x="116" y="56" width="24" height="30" rx="5" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="5 4">
+              <animate attributeName="stroke-dashoffset" values="0;18" dur="1.6s" repeatCount="indefinite"></animate>
+            </rect>
+          </svg>
+        </div>
+        <h3>Scheduling, solved</h3>
+        <p>&ldquo;Find 30 minutes with Priya and Sam this week.&rdquo; ZenScail checks everyone&rsquo;s calendars, proposes the slot, sends the invites.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= INTERACTIVE DEMO ======================= -->
+<section class="section" id="demo" data-screen-label="Product Demo">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Try it right here</span>
+      <h2 class="display">Go on, <em>click around.</em></h2>
+      <p class="lede">This is a living preview of ZenScail. Open emails, pick a reply, book the meeting the AI found for you.</p>
+    </div>
+
+    <div class="demo-shell reveal" id="demo-app">
+      <div class="demo-titlebar">
+        <span class="dot-tl"></span><span class="dot-tl"></span><span class="dot-tl"></span>
+        <span class="demo-addr">zenscail.app</span>
+        <span class="demo-hint">
+          <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true"><path d="M 6.5 0.5 L 7.8 4.7 L 12 6 L 7.8 7.3 L 6.5 11.5 L 5.2 7.3 L 1 6 L 5.2 4.7 Z" fill="var(--accent)"></path></svg>
+          <span>Interactive — everything is clickable</span>
+        </span>
+      </div>
+      <div class="demo-body">
+        <div class="demo-side">
+          <button class="demo-tab" data-pane="brief" type="button">
+            <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><circle cx="8.5" cy="10" r="4" fill="none" stroke="currentColor" stroke-width="1.7"></circle><path d="M 2 14 H 15 M 8.5 2 V 4 M 3 5 L 4.5 6.5 M 14 5 L 12.5 6.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"></path></svg>
+            <span>Daily brief</span>
+          </button>
+          <button class="demo-tab active" data-pane="inbox" type="button">
+            <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><rect x="1.5" y="3" width="14" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"></rect><path d="M 2 5 L 8.5 9.5 L 15 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path></svg>
+            <span>Inbox</span>
+            <span class="badge">3</span>
+          </button>
+          <button class="demo-tab" data-pane="cal" type="button">
+            <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><rect x="1.5" y="2.5" width="14" height="12.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"></rect><path d="M 1.5 6.5 H 15.5 M 5 1 V 4 M 12 1 V 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"></path></svg>
+            <span>Calendar</span>
+          </button>
+          <p class="demo-side-foot">Maya&rsquo;s workspace · Wednesday, April 8</p>
+        </div>
+
+        <!-- Brief pane -->
+        <div class="demo-pane" id="pane-brief">
+          <div class="briefp">
+            <h3>Good morning, Maya</h3>
+            <p class="bp-sub">Here&rsquo;s your Wednesday in thirty seconds.</p>
+            <ul class="brief-items" style="margin-top: 20px;">
+              <li><span class="bi-time">First</span><span><strong>Reply to Priya</strong> — contract sign-off due Friday. Draft is waiting in your inbox.</span></li>
+              <li><span class="bi-time">9:30 AM</span><span><strong>Design review</strong> — product team, 45 min. Figma linked in the invite.</span></li>
+              <li><span class="bi-time">2:30 PM</span><span><strong>1:1 with Sam</strong> — he moved it from noon and wants to cover the Q2 roadmap.</span></li>
+              <li><span class="bi-time">Heads up</span><span>Atlas Studio invoice (<strong>$4,800</strong>) due April 14 — confirm receipt when you get a sec.</span></li>
+              <li><span class="bi-time">Quiet</span><span>After 3 PM you&rsquo;re free. I&rsquo;ve held it for deep work — say the word and I&rsquo;ll let meetings in.</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Inbox pane -->
+        <div class="demo-pane inbox-pane active" id="pane-inbox">
+          <div class="email-list" id="email-list"></div>
+          <div class="email-detail">
+            <h4 class="ed-subject" id="ed-subject"></h4>
+            <p class="ed-meta" id="ed-meta"></p>
+            <div class="ai-summary">
+              <span class="ai-summary-label">
+                <svg width="12" height="12" viewBox="0 0 13 13" aria-hidden="true"><path d="M 6.5 0.5 L 7.8 4.7 L 12 6 L 7.8 7.3 L 6.5 11.5 L 5.2 7.3 L 1 6 L 5.2 4.7 Z" fill="var(--accent)"></path></svg>
+                <span>ZenScail summary</span>
+              </span>
+              <ul id="ed-summary"></ul>
+            </div>
+            <div class="reply-chips" id="ed-chips">
+              <p class="reply-chips-label">Reply in your voice — pick a direction:</p>
+              <div class="reply-chip-row"></div>
+              <div class="draft-box" id="ed-draft"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Calendar pane -->
+        <div class="demo-pane cal-pane" id="pane-cal">
+          <div class="cal-head">
+            <h3>This week</h3>
+            <span>April 6 – 10</span>
+          </div>
+          <div class="cal-grid">
+            <span class="cg-corner"></span>
+            <span class="cg-day">Mon 6</span><span class="cg-day">Tue 7</span><span class="cg-day cg-today">Wed 8</span><span class="cg-day">Thu 9</span><span class="cg-day">Fri 10</span>
+            <span class="cg-hour">9 AM</span>
+            <span class="cg-cell"><span class="cal-event ce-sage">Team sync</span></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"><span class="cal-event ce-gold ce-tall">Design review<br />9:30 – 10:15</span></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"><span class="cal-event ce-sage">Planning</span></span>
+            <span class="cg-hour">10 AM</span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"><span class="cal-event ce-rose">Priya — terms call</span></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"></span>
+            <span class="cg-hour">11 AM</span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"><span class="cal-suggest" id="cal-suggest" role="button" tabindex="0">AI found this slot — tap to book</span></span>
+            <span class="cg-cell"></span>
+            <span class="cg-hour">2 PM</span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"><span class="cal-event ce-sage">Interview</span></span>
+            <span class="cg-cell"><span class="cal-event ce-rose">1:1 with Sam · 2:30</span></span>
+            <span class="cg-cell"></span>
+            <span class="cg-cell"></span>
+          </div>
+          <p class="cal-foot" id="cal-foot-msg">
+            <svg width="15" height="15" viewBox="0 0 13 13" aria-hidden="true"><path d="M 6.5 0.5 L 7.8 4.7 L 12 6 L 7.8 7.3 L 6.5 11.5 L 5.2 7.3 L 1 6 L 5.2 4.7 Z" fill="var(--accent)"></path></svg>
+            <span>You asked for 30 minutes with Priya and Sam this week. <strong>Thursday 11:00</strong> works for everyone — tap the slot to book it.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PRICING ======================= -->
+<section class="section" id="pricing" data-screen-label="Pricing">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Pricing</span>
+      <h2 class="display">Free <em>by nature.</em></h2>
+      <p class="lede">ZenScail is built around a simple idea: the app is free. Bring your own AI keys and pay nothing — or let us handle the AI and pay one calm price.</p>
+    </div>
+
+    <div class="pricing-grid">
+      <div class="price-card reveal">
+        <span class="pc-tag">Bring your own keys</span>
+        <h3>ZenScail Free</h3>
+        <p class="pc-sub">Plug in your own API keys. The whole app, no meter running.</p>
+        <div class="price-figure">
+          <span class="pf-amount">$0</span>
+          <span class="pf-per">forever — you only pay your AI provider</span>
+        </div>
+        <ul class="price-list">
+          <li><svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>Every feature — daily brief, summaries, drafts, scheduling</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>Your keys, your models, your data — calls go straight to your provider</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>Unlimited accounts and calendars</span></li>
+        </ul>
+        <div class="byok-chips">
+          <span class="byok-chip">OpenAI</span>
+          <span class="byok-chip">Anthropic</span>
+          <span class="byok-chip">Gemini</span>
+          <span class="byok-chip">Mistral</span>
+          <span class="byok-chip">Ollama (local)</span>
+        </div>
+        <a class="btn btn-ghost" href="#join" style="margin-top: 28px;">Join the waitlist</a>
+      </div>
+
+      <div class="price-card featured reveal reveal-d1">
+        <h3>ZenScail Cloud</h3>
+        <p class="pc-sub">No keys, no setup. Our models, tuned for email — it just works.</p>
+        <div class="price-figure">
+          <span class="pf-amount">$12</span>
+          <span class="pf-per">per month, when we launch</span>
+        </div>
+        <ul class="price-list">
+          <li><svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>Everything in Free, zero configuration</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>AI usage included — no token math, no surprise bills</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true"><path d="M 2 8 L 6 12 L 13 3" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>Priority support and early features</span></li>
+        </ul>
+        <a class="btn btn-accent" href="#join">Join the waitlist</a>
+      </div>
+    </div>
+    <p class="pricing-note">Either way, your email never trains anyone&rsquo;s models. That&rsquo;s a promise, not a setting.</p>
+  </div>
+</section>
+
+<!-- ======================= FINAL CTA ======================= -->
+<section class="cta-final" id="join" data-screen-label="Final CTA">
+  <div class="wrap reveal">
+    <svg class="cta-sun" width="72" height="48" viewBox="0 0 72 48" aria-hidden="true">
+      <circle cx="36" cy="36" r="16" fill="var(--accent)"></circle>
+      <path d="M 4 40 H 68" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"></path>
+      <path d="M 36 4 V 12 M 14 13 L 19.5 18.5 M 58 13 L 52.5 18.5" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round"></path>
+    </svg>
+    <h2 class="display">Tomorrow morning<br />could feel <em>different.</em></h2>
+    <p class="lede">We&rsquo;re letting people in a few hundred at a time. Grab a spot — it&rsquo;s free.</p>
+    <div class="waitlist-wrap" style="margin-top: 32px;">
+      <form class="waitlist">
+        <input type="email" placeholder="you@work.com" aria-label="Email address" />
+        <button class="btn btn-accent" type="submit">Join the waitlist</button>
+      </form>
+      <div class="waitlist-success">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="var(--accent)"></circle><path d="M 5 9.5 L 8 12.5 L 13 6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span>You&rsquo;re on the list — see you at sunrise.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FOOTER ======================= -->
+<footer class="footer" data-screen-label="Footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="#top">
+          <svg width="24" height="24" viewBox="0 0 30 30" aria-hidden="true">
+            <path d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15" fill="none" stroke="var(--ink)" stroke-width="2.6" stroke-linecap="round"></path>
+            <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)"></circle>
+          </svg>
+          <span>ZenScail</span>
+        </a>
+        <p class="footer-tag">Email and calendar, gathered into one calm morning brief. Built for people who&rsquo;d rather be working.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#demo">Live demo</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#join">Waitlist</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#top">About</a></li>
+          <li><a href="#top">Blog</a></li>
+          <li><a href="#top">Careers</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Trust</h4>
+        <ul>
+          <li><a href="#top">Privacy</a></li>
+          <li><a href="#top">Security</a></li>
+          <li><a href="#top">Terms</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>&copy; 2026 ZenScail. All rights reserved.</span>
+      <span>Made with care, before 9 AM.</span>
+    </div>
+  </div>
+</footer>
+
+<div id="zs-tweaks-root"></div>
+
+<script src="zenscail-fx.js"></script>
+<script src="zenscail-demo.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="zenscail-tweaks.jsx"></script>
+
+</body>
+</html>
