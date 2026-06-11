@@ -27,18 +27,18 @@ Developer API key is created at https://app.corsair.dev/api-keys.
    await inst.plugins.upsert("gmail", { mode: "cautious" });
    await inst.plugins.upsert("googlecalendar", { mode: "cautious" });
    ```
-3. Permissions — modes: `permissive` | `cautious` | `strict`, plus per-operation overrides:
+3. Permissions — modes (verified from SDK types, the web doc summary was wrong): `open` (all allowed) | `cautious` (writes require approval, default) | `strict` (reads only, writes require approval) | `readonly` (writes blocked). Per-operation override policies: `allow` | `deny` | `require_approval`.
    ```ts
    await inst.plugins.permissions.setMode("gmail", "strict");
    await inst.plugins.permissions.setOverride("gmail", "api.send", "deny");
    await inst.plugins.permissions.deleteOverride("gmail", "api.send");
    ```
-4. Root OAuth credentials (instance-level, shared Google OAuth app):
+4. **Managed OAuth (preferred):** `gmail` and `googlecalendar` support `supportsManagedOAuth` — Corsair hosts the Google OAuth app, no Google Cloud project needed:
    ```ts
-   await inst.plugins.upsert("gmail", { authType: "oauth_2" });
-   await inst.plugins.credentials.setRoot("gmail", "client_id", "...");
-   await inst.plugins.credentials.setRoot("gmail", "client_secret", "...");
+   await inst.plugins.upsert("gmail", { mode: "cautious", authType: "oauth_2", useManaged: true });
    ```
+   Only if bringing our own OAuth app: `inst.plugins.credentials.setRoot("gmail", "client_id" | "client_secret" | "redirect_url" | "topic_id", ...)`.
+5. After config changes: `await inst.runtime.refresh()` (or check `inst.runtime.status()` → `{ warm, dbOk }`).
 
 ## Tenants & auth (per user)
 
@@ -121,6 +121,19 @@ const key = await corsair.instance(id).tenant(tid).mcpKeys.create("vercel-agent"
 const mcpClient = await createVercelAiMcpClient({ url: key.mcpHttpUrl, apiKey: key.secret });
 ```
 
+SDK facts (verified in `@corsair-dev/app@0.1.5` types):
+- `RunResult<T>` = `{ success: true, data: T } | { success: false, signInLink: string }`.
+- `t.mcp.config()` returns a `CorsairMcpConfig` for any adapter; `t.mcp.createVercelClient()` lazily imports the Vercel peer dep.
+- Errors throw `CorsairApiError { status, code, details }` on non-2xx.
+- Gmail account-level credential fields include `webhook_signature` (relevant for Phase 6 webhook verification); gmail root fields include `topic_id` (Pub/Sub, only for self-managed OAuth).
+- In this repo: `lib/corsair.ts` (client + `corsairTenant()` + `runOrThrow()`), `scripts/provision-corsair.mts` (`pnpm provision:corsair`), `scripts/corsair-status.mts` (health check).
+- The package is **ESM-only** (`exports` has only an `import` condition). Standalone scripts must be `.mts` (plain `.ts` under tsx runs as CJS and fails with ERR_PACKAGE_PATH_NOT_EXPORTED). Imports from Next.js code are fine.
+
+Verified live (2026-06-12, instance `fddeb0a0c5d24d29a39ccfe9b90f2f0d`):
+- `tenants.create(id)` throws `CorsairApiError` 409 `tenant_already_exists` on re-create — handle it (see `lib/tenant.ts`).
+- **`db.*` reads succeed even for tenants that never connected OAuth** (they query Corsair's local cache and return empty). To check whether a tenant is connected, probe an `api.*` op (e.g. `gmail.api.labels.list`, `googlecalendar.api.events.getMany` — both accept no input) and check `result.success`.
+- Managed OAuth: plugins were upserted with `useManaged: true` but the API echoes `useManaged=undefined`; connect links are issued fine. Confirm end-to-end Google OAuth on first real connect.
+
 Other SDKs: OpenAI (`getOpenAiMcpConfig` / `createOpenAiMcpServer`), Claude Agent SDK (`claudeMcpServerConfig`). Do NOT add Corsair operation names to the agent system prompt — the MCP server handles discovery.
 
 ## Gmail plugin operations (`gmail`)
@@ -145,7 +158,15 @@ DB (`googlecalendar.db.*`): `calendars.search`, `events.search`
 
 Webhooks: `googlecalendar.webhooks.onEventChanged`
 
-Per-operation schemas: `https://api.corsair.dev/md/integrations/<operation-path>`.
+Per-operation schemas: `https://api.corsair.dev/md/integrations/<dotted.operation.path>` (e.g. `.../gmail.api.messages.list`).
+
+### Verified operation schemas (fetched 2026-06-12)
+
+- `gmail.api.messages.list` input: `{ userId?, q?, maxResults?, pageToken?, labelIds?, includeSpamTrash? }` → `{ messages?: GmailMessage[], nextPageToken?, resultSizeEstimate? }`. GmailMessage = `{ id, threadId, labelIds, snippet, historyId, internalDate, sizeEstimate, payload: { mimeType, filename, headers: {name,value}[], body: { attachmentId?, size?, data? }, parts: nested }, raw? }`.
+- `gmail.api.messages.send` input: `{ raw: string (REQUIRED), userId?, threadId? }`. **`raw` must be a full RFC 2822 MIME message, base64url-encoded** (`+`→`-`, `/`→`_`, no `=` padding). No structured to/subject/body fields. Pass `threadId` for replies.
+- `gmail.api.threads.get` input: `{ id: string (required), userId?, format?: "minimal"|"full"|"metadata", metadataHeaders?: string[] }` → `{ id, snippet, historyId, messages: GmailMessage[] }`.
+- `gmail.db.messages.search` filterable fields: `entity_id, id, threadId, snippet, historyId, internalDate, sizeEstimate, raw, subject, body, from, to, createdAt`. String ops: `equals|contains|startsWith|endsWith|in`; number: `equals|gt|gte|lt|lte|in`; date: `equals|before|after|between`. Call shape: `{ data: { field: { op: value } }, limit, offset }`. Note: cached rows have flattened `subject/from/to/body` columns (richer than the thread cache).
+- `gmail.db.threads.search` filterable: `entity_id, id, snippet, historyId, createdAt` only — message cache is more useful for inbox lists.
 
 ## Env vars convention
 
