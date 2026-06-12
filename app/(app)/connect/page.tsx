@@ -77,6 +77,13 @@ export default async function ConnectPage() {
       <p className="mt-3 text-center text-xs text-neutral-500">
         You&apos;ll be redirected to a secure Corsair page to authorize access.
       </p>
+      {allConnected && (
+        <p className="mt-6 text-center text-sm">
+          <a href="/mail" className="text-amber-400 hover:text-amber-300">
+            All set — go to your inbox →
+          </a>
+        </p>
+      )}
     </div>
   );
 }

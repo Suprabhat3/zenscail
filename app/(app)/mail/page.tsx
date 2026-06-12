@@ -84,7 +84,11 @@ export default async function MailPage({
         )}
         {messages.map((m) => (
           <li key={m.id} className="group flex items-center gap-3 px-4 py-3 hover:bg-neutral-800/50">
-            <Link href={`/mail/thread/${m.threadId}`} className="min-w-0 flex-1">
+            <Link
+              href={`/mail/thread/${m.threadId}`}
+              data-thread-link
+              className="min-w-0 flex-1 rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="truncate text-sm font-medium text-neutral-200">
                   {m.from || "(unknown sender)"}
@@ -99,13 +103,13 @@ export default async function MailPage({
             <div className="hidden shrink-0 gap-1 group-hover:flex">
               <form action={archiveMessageAction}>
                 <input type="hidden" name="id" value={m.id} />
-                <button title="Archive" className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
+                <button data-row-action="archive" title="Archive" className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
                   Archive
                 </button>
               </form>
               <form action={trashMessageAction}>
                 <input type="hidden" name="id" value={m.id} />
-                <button title="Trash" className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
+                <button data-row-action="trash" title="Trash" className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
                   Trash
                 </button>
               </form>

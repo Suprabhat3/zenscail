@@ -1,7 +1,17 @@
-﻿/* ============================================================
-   ZenScail â€” warm minimal landing
-   Cream paper Â· warm ink Â· rose accent Â· editorial serif
+﻿@import "tailwindcss";
+
+/* ============================================================
+   ZenScail — warm minimal landing
+   Cream paper · warm ink · rose accent · editorial serif
+
+   NOTE: all landing styles live in @layer components: above
+   Tailwind's base/preflight (so the landing keeps its reset and
+   element styles) but BELOW utilities (so the app shell's
+   Tailwind classes are never overridden — an unlayered
+   universal margin/padding reset would beat every spacing utility.
    ============================================================ */
+
+@layer components {
 
 :root {
   --bg: #FAF5EC;
@@ -1213,3 +1223,5 @@ section[data-screen-label] { position: relative; }
   .demo-tab span:not(.badge) { font-size: 12.5px; }
   .brief-items .bi-time { width: 54px; }
 }
+
+} /* end @layer components (landing styles) */

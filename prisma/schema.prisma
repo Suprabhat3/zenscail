@@ -18,8 +18,23 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   sessions        Session[]
   accounts        Account[]
+  aiSettings      UserAiSettings?
 
   @@map("user")
+}
+
+model UserAiSettings {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier            String   @default("cloud") // "cloud" | "byok"
+  provider        String? // "openai" | "anthropic" | "google" (byok only)
+  model           String?
+  encryptedApiKey String?  @map("encrypted_api_key") // AES-256-GCM, see lib/crypto.ts
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("user_ai_settings")
 }
 
 model Session {

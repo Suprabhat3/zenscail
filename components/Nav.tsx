@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSession } from "@/lib/auth-client";
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const { data: session, isPending } = useSession();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -33,9 +36,26 @@ export function Nav() {
           <a href="#demo">See it work</a>
           <a href="#pricing">Pricing</a>
         </div>
-        <a className="btn btn-primary btn-sm" href="#join">
-          Join the waitlist
-        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {session ? (
+            <Link className="btn btn-primary btn-sm" href="/mail">
+              Open app →
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="btn btn-ghost btn-sm"
+                style={{ visibility: isPending ? "hidden" : undefined }}
+              >
+                Sign in
+              </Link>
+              <Link className="btn btn-primary btn-sm" href="/login?mode=signup">
+                Get started
+              </Link>
+            </>
+          )}
+        </div>
       </div>
     </nav>
   );

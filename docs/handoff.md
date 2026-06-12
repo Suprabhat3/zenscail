@@ -1,0 +1,84 @@
+# Handoff — ZenScail (written 2026-06-12, end of day 1; updated 2026-06-12 day 2)
+
+> **Day-2 update: Phases 3, 4, 5 and 8 are code-complete; build passes.** Corsair instance re-verified healthy. **The DB has 0 users** — the manual Phase 2 verification (sign up → /connect → Google OAuth → /mail) was never done and still blocks live verification of everything downstream. Run `pnpm exec tsx --env-file=.env scripts/check-tenant-connectivity.mts` to re-check connectivity any time.
+>
+> - **Phase 3 (Calendar):** `lib/gcal.ts` (typed helpers; `searchCachedEvents` filters date ranges in-app — the events cache has NO start/end filter columns, see corsair-reference.md "Verified calendar operation schemas"), `(app)/calendar` week grid with prev/next/today + refresh, `calendar/new` (form + free/busy via `getAvailability`), `calendar/event/[id]` (edit/delete + attendee RSVPs), shared `components/calendar/EventForm.tsx` + `TimeZoneField.tsx` (browser tz via hidden input), "Create event from this email" quick-add on the thread page. All writes use `sendUpdates: "all"` so attendees get invite emails.
+> - **Phase 4 (LLM layer):** `ai` + `@ai-sdk/openai/anthropic/google/react/mcp` installed; `UserAiSettings` model pushed to Neon (`db push`); `lib/crypto.ts` (AES-256-GCM keyed off new `APP_SECRET` in .env); `lib/ai/models.ts` (curated model lists), `lib/ai/registry.ts` (`getModelForUser` → BYOK or cloud, plus a `cheapModel` for the Phase 7 classifier); `/settings/ai` page with save + "test key" (1-token generateText). **`OPENAI_API_KEY` is still NOT set** — cloud tier throws until it is; BYOK works without it.
+> - **Phase 5 (Agent chat):** `app/api/chat/route.ts` (`streamText` + Corsair MCP `createVercelClient().tools()`, `stepCountIs(15)`, system prompt has date/time + user email, no op names), `(app)/chat` UI via `useChat` with tool-call progress lines. Untested live (needs a connected account + an LLM key). Remember gotcha 6: `cautious` mode may stall MCP writes pending approval.
+> - **Phase 8 (Keyboard shortcuts):** `components/shortcuts/KeyboardShortcuts.tsx` mounted in the `(app)` layout — c/r/e/#/j/k/Enter/u, `/` search, `g i|c|t` nav, `?` cheat-sheet modal; disabled while typing. Mail rows expose `data-thread-link` / `data-row-action` hooks.
+>
+> - **Navigation/product polish (day 2, later):** landing `Nav` is now session-aware (`useSession`) — Sign in / Get started → `/login` (`?mode=signup` preselects signup), or "Open app" when signed in. `/login` redesigned (split branding panel + labeled form + Google button, honors `?next=`). App shell header rebuilt: `components/app/AppNav.tsx` (active-route highlighting) + `components/app/UserMenu.tsx` (avatar dropdown: Profile / AI settings / Connected accounts / Sign out → lands on `/`). New `/settings` section with tabbed layout (`SettingsTabs`): `/settings/profile` (rename via `authClient.updateUser`, change password via `authClient.changePassword` with `revokeOtherSessions`), `/settings/ai` reworked to fit the layout, `/settings` redirects to profile. `/connect` links back to inbox when all connected. Note: the standalone `SignOutButton` component is no longer used by the layout.
+>
+> **Remaining:** Phase 6 (webhooks — still blocked on the unknown registration/signature mechanism, needs ngrok), Phase 7 (priority filtering — depends on 6 for triggers, but the backfill-on-refresh path could be built now using `registry.ts`'s `cheapModel`), Phase 9 (polish + README). Nothing committed today; working tree on `dev`.
+
+For the next agent/session. Read this first, then [implementation-plan.md](./implementation-plan.md) (the phased plan) and [corsair-reference.md](./corsair-reference.md) (cached + live-verified Corsair API knowledge — do NOT re-fetch the Corsair web docs; everything needed so far is in that file, and it has corrections the web docs get wrong).
+
+## What ZenScail is
+
+AI-powered Gmail + Google Calendar manager for a hackathon. Tech: Next.js 16.2.9 (App Router, Turbopack), Prisma 7 + Neon Postgres, Tailwind 4, Better Auth, Corsair (`@corsair-dev/app`) as the integration layer. Marketing landing page at `/` predates this work — don't touch it.
+
+**Decisions already made with the user (don't re-ask):**
+- Multi-user app with real login; each user maps 1:1 to a Corsair tenant (tenant id = our user id).
+- LLM strategy: BYOK multi-provider (user supplies own API key + picks model = free tier) AND a cloud tier using our `OPENAI_API_KEY`. Build provider-agnostic on the Vercel AI SDK.
+- Bonus scope: realtime webhooks, AI priority filtering, keyboard shortcuts. Vector search is OUT of scope.
+- **Use pnpm for everything. Never npm.**
+
+## Status: Phases 0–2 code-complete; 3–9 not started
+
+| Phase | Status |
+|---|---|
+| 0 Corsair plumbing | ✅ done, provisioned + live-verified |
+| 1 Auth + tenant mapping + /connect | ✅ done, sign-up smoke-tested against Neon |
+| 2 Mail UI | ✅ code-complete, build passes, **NOT yet tested with a real connected Gmail** |
+| 3 Calendar UI | ✅ code-complete (day 2), untested live |
+| 4 LLM provider layer (BYOK + cloud) | ✅ code-complete (day 2); `OPENAI_API_KEY` still unset |
+| 5 Agent chat (Corsair MCP + Vercel AI SDK) | ✅ code-complete (day 2), untested live |
+| 6 Webhooks + SSE | ⬜ blocked on registration mechanism |
+| 7 Priority filtering | ⬜ |
+| 8 Keyboard shortcuts | ✅ code-complete (day 2) |
+| 9 Polish + README | ⬜ |
+
+**First thing tomorrow:** ask the user whether they completed the manual verification step — `pnpm dev` → sign up at `/login` → `/connect` → connect Google via the Corsair link → check `/mail` populates. This validates Corsair's managed OAuth end-to-end and is the only untested link in the chain. If `/mail` shows data, Phase 2 is fully verified; fix whatever breaks before building Phase 3 on the same patterns. Note: the `db.messages.search` row shape in `lib/gmail.ts` (`CachedMessage`, and `normalizeRows()` which accepts array or `{results}`) is a defensive guess — the real shape was unverifiable without a connected account. Verify and tighten once real data flows.
+
+## Environment
+
+`.env` (real values present, do not commit): `DATABASE_URL` (Neon), `CORSAIR_DEV_KEY` (ch_…), `CORSAIR_INSTANCE_ID=fddeb0a0c5d24d29a39ccfe9b90f2f0d`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=http://localhost:3000`, `GOOGLE_CLIENT_ID/SECRET` (EMPTY — optional, only for Google *app login*, unrelated to Corsair's Gmail OAuth which is managed). Still needed later: `OPENAI_API_KEY` (Phase 4), `APP_SECRET` for encrypting BYOK keys (Phase 4).
+
+Corsair instance "zenscail" is active: gmail + googlecalendar plugins installed, `mode=cautious`, `authType=oauth_2`, managed OAuth. Health check: `pnpm exec tsx --env-file=.env scripts/corsair-status.mts`.
+
+## Code map (what was built)
+
+- `lib/corsair.ts` — lazy client singleton (lazy so builds pass without env), `corsairInstance()`, `corsairTenant(tenantId)`, `runOrThrow()` + `CorsairAuthRequiredError` carrying the `signInLink`.
+- `lib/tenant.ts` — `ensureCorsairTenant(userId)`: creates tenant lazily, handles 409 `tenant_already_exists`, persists `user.corsairTenantId`.
+- `lib/auth.ts` — Better Auth: email/password enabled; Google social auto-enables when env vars set; `databaseHooks.user.create.after` provisions the Corsair tenant best-effort; `nextCookies()` plugin. Handler at `app/api/auth/[...all]/route.ts`; client in `lib/auth-client.ts`; `getSession()/requireSession()` in `lib/session.ts`.
+- `proxy.ts` — Next 16 renamed middleware→proxy. Optimistic cookie check guarding `/mail /calendar /chat /connect /settings`.
+- `prisma/schema.prisma` — User (with `corsairTenantId`), Session, Account, Verification, Waitlist. **Schema is managed with `prisma db push`, NOT migrate** — `migrate dev` wants to reset the DB and would wipe real waitlist signups. Keep using `db push`.
+- `lib/gmail.ts` — typed helpers: `searchCachedMessages` (merges subject/from/body `contains` queries — the filter language has no OR), `refreshMessages`, `getThread`, `sendEmail` (builds base64url RFC 2822 via `buildRawEmail` — Gmail send takes ONLY `raw`), `trashMessage`, `modifyMessage`, MIME body extraction (`extractBodies`), `header()`.
+- `app/(app)/` — protected shell layout with nav (Mail/Calendar/Chat/Settings — last three routes don't exist yet); `mail/page.tsx` (inbox + search + refresh + archive/trash), `mail/thread/[id]/page.tsx` (thread + reply), `mail/compose/page.tsx`, `mail/actions.ts` (all server actions; on `success:false` they `redirect("/connect")`), `connect/page.tsx` + `actions.ts` (status probes + connect-link redirect).
+- `app/(auth)/login/page.tsx` + `components/auth/LoginForm.tsx`, `SignOutButton.tsx`.
+- `scripts/provision-corsair.mts` (`pnpm provision:corsair`, idempotent), `scripts/corsair-status.mts`.
+
+## Gotchas (hard-won — these all bit us)
+
+1. **`@corsair-dev/app` is ESM-only.** Standalone scripts must be `.mts`; plain `.ts` under tsx runs CJS and dies with `ERR_PACKAGE_PATH_NOT_EXPORTED`. Inline `tsx -e` also fails. Imports from Next.js code are fine.
+2. **`db.*` reads succeed for unconnected tenants** (empty cache) — never use them to test connectivity. Probe `api.*` ops (`gmail.api.labels.list`, `googlecalendar.api.events.getMany`, both accept no input) and check `result.success`.
+3. **`tenant.run()` never throws on missing auth** — returns `{success:false, signInLink}`. Management calls DO throw `CorsairApiError` (e.g. 409 on duplicate tenant create).
+4. This Next.js (16.2.9) differs from training data: middleware is `proxy.ts`, `params`/`searchParams` are Promises (await them). Check `node_modules/next/dist/docs/` before using unfamiliar APIs (AGENTS.md mandates this).
+5. Read `docs/corsair-reference.md` "Verified operation schemas" before calling any new Corsair op; fetch unknown schemas from `https://api.corsair.dev/md/integrations/<dotted.path>` (e.g. `...integrations/gmail.api.messages.list`) and **append findings to that doc**.
+6. Permission modes are `open|cautious|strict|readonly`. `cautious` (current) may require approval for writes invoked via MCP agent chat — if Phase 5 tool calls stall on sends, this is the first thing to check (consider per-op `allow` overrides instead of `open`).
+
+## Tomorrow's plan (in order)
+
+1. Verify Phase 2 with the user's connected account (see above); tighten `CachedMessage` shape.
+2. **Phase 3 — Calendar:** mirror the mail patterns. Reads: `googlecalendar.db.events.search` / `db.calendars.search`; writes: `api.events.create/update/delete` (attendees = invites); `api.calendar.getAvailability` for free/busy. Fetch those schemas first (gotcha 5). Routes: `(app)/calendar`, event create/edit form, week grid.
+3. **Phase 4 — LLM layer:** `pnpm add ai @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google`; `UserAiSettings` Prisma model (provider, model, AES-GCM-encrypted key, tier); `lib/ai/registry.ts` → `getModelForUser(userId)`; `/settings/ai` page.
+4. **Phase 5 — Agent chat:** `app/api/chat/route.ts` using `streamText` + `await (await corsairTenant(id).mcp.createVercelClient()).tools()`; system prompt must include current date/time + user email/timezone; do NOT list Corsair op names in the prompt. UI via AI SDK `useChat` at `(app)/chat`.
+5. Then phases 6–8 per the implementation plan.
+
+Target demo: keyboard-driven inbox triage → live webhook email arrival → chat: "Send a calendar invite to friend@corsair.dev at 9 AM next Thursday. Send him an email too saying I look forward to our meeting."
+
+## Open questions
+
+- Did managed OAuth work end-to-end? (User was testing at end of day 1.)
+- Exact webhook registration + signature verification mechanism for Phase 6 (`gmail.webhooks.messageChanged`, `googlecalendar.webhooks.onEventChanged`) — not in cached docs; check the Corsair dashboard or ask Corsair support. The tenant credential field `webhook_signature` exists and is probably part of the answer. Local dev will need ngrok.
+- Nothing is committed yet today — all of this is uncommitted working tree on `main`. Ask the user whether to commit before making further changes.

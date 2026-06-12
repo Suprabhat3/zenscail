@@ -168,6 +168,16 @@ Per-operation schemas: `https://api.corsair.dev/md/integrations/<dotted.operatio
 - `gmail.db.messages.search` filterable fields: `entity_id, id, threadId, snippet, historyId, internalDate, sizeEstimate, raw, subject, body, from, to, createdAt`. String ops: `equals|contains|startsWith|endsWith|in`; number: `equals|gt|gte|lt|lte|in`; date: `equals|before|after|between`. Call shape: `{ data: { field: { op: value } }, limit, offset }`. Note: cached rows have flattened `subject/from/to/body` columns (richer than the thread cache).
 - `gmail.db.threads.search` filterable: `entity_id, id, snippet, historyId, createdAt` only — message cache is more useful for inbox lists.
 
+### Verified calendar operation schemas (fetched 2026-06-12)
+
+- `googlecalendar.db.events.search` filterable fields: `entity_id, id, htmlLink, created, updated, summary, description, location, colorId, endTimeUnspecified, recurringEventId, iCalUID, sequence, attendeesOmitted, hangoutLink, calendarId, createdAt` (+ guest/lock booleans). **No start/end dateTime filters** — date-range filtering must be done in app code after fetching cached rows. `created`/`updated` are plain strings (contains/startsWith etc., no date ops).
+- `googlecalendar.db.calendars.search` filterable: `entity_id, id, summary, description, location, timeZone, createdAt`.
+- `googlecalendar.api.events.create` input: `{ calendarId? (default "primary"), event: { summary?, description?, location?, start?: {date?|dateTime?, timeZone?}, end?: {...}, attendees?: [{email?, displayName?, optional?, responseStatus?, ...}], recurrence?: string[], reminders?, visibility?, status?, ... }, sendUpdates?: "all"|"externalOnly"|"none", sendNotifications?, conferenceDataVersion?, maxAttendees? }`. Provide at minimum summary/start/end. Use `sendUpdates: "all"` so attendees get invite emails. Output is the full event (id, htmlLink, attendees, ...).
+- `googlecalendar.api.events.update` input: same as create plus required `id`. Note: behaves like a Google `update` (full replace semantics) — send the complete event body.
+- `googlecalendar.api.events.delete` input: `{ id (required), calendarId?, sendUpdates?, sendNotifications? }` → void. Marked DESTRUCTIVE.
+- `googlecalendar.api.events.getMany` input: `{ calendarId?, timeMin?, timeMax?, timeZone?, singleEvents?, maxResults?, pageToken?, q?, orderBy?: "startTime"|"updated", showDeleted? }` → `{ items?: GcalEvent[], nextPageToken?, timeZone?, ... }`. `orderBy: "startTime"` requires `singleEvents: true` (Google API rule).
+- `googlecalendar.api.calendar.getAvailability` input: `{ timeMin (required), timeMax (required), timeZone?, items?: [{id}] }` → `{ calendars?: { [id]: { busy: [{start,end}] } }, ... }` (the `calendars` map is untyped `{}` in the schema; Google freebusy shape assumed — verify with live data).
+
 ## Env vars convention
 
 ```
