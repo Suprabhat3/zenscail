@@ -33,11 +33,14 @@ Developer API key is created at https://app.corsair.dev/api-keys.
    await inst.plugins.permissions.setOverride("gmail", "api.send", "deny");
    await inst.plugins.permissions.deleteOverride("gmail", "api.send");
    ```
-4. **Managed OAuth (preferred):** `gmail` and `googlecalendar` support `supportsManagedOAuth` — Corsair hosts the Google OAuth app, no Google Cloud project needed:
+4. **OAuth (RESOLVED 2026-06-12 day 3): we bring our OWN Google OAuth app.** Managed OAuth is NOT available to our dev account: `catalog.plugins.list()` reports `supportsManagedOAuth=true` for gmail/googlecalendar, BUT `upsert(..., { authType: "managed_oauth" })` throws `CorsairApiError 400 managed_oauth_not_configured` ("No managed OAuth credentials are configured for plugin 'gmail'"). Passing `{ authType: "oauth_2", useManaged: true }` silently no-ops — the read-back `PluginState.authType` enum is only `oauth_2|api_key|bot_token`, so `useManaged` echoes `undefined` and never engages. So:
    ```ts
-   await inst.plugins.upsert("gmail", { mode: "cautious", authType: "oauth_2", useManaged: true });
+   await inst.plugins.upsert("gmail", { mode: "cautious", authType: "oauth_2" });
+   await inst.plugins.credentials.setRoot("gmail", "client_id", process.env.GOOGLE_CLIENT_ID);
+   await inst.plugins.credentials.setRoot("gmail", "client_secret", process.env.GOOGLE_CLIENT_SECRET);
+   await inst.plugins.credentials.setRoot("gmail", "redirect_url", "https://api.corsair.dev/oauth/callback");
    ```
-   Only if bringing our own OAuth app: `inst.plugins.credentials.setRoot("gmail", "client_id" | "client_secret" | "redirect_url" | "topic_id", ...)`.
+   This is done in `scripts/provision-corsair.mts` for both gmail + googlecalendar (root creds verified SET). **Instance `oauthCallbackUrl` = `https://api.corsair.dev/oauth/callback`** (from `inst.get()`). Google Cloud console requirements for the OAuth web client: enable Gmail API + Google Calendar API, add that redirect URI, and add test users while the consent screen is unverified. `setRoot` fields per plugin: `client_id | client_secret | redirect_url` (+ `topic_id` for gmail Pub/Sub).
 5. After config changes: `await inst.runtime.refresh()` (or check `inst.runtime.status()` → `{ warm, dbOk }`).
 
 ## Tenants & auth (per user)
@@ -165,7 +168,9 @@ Per-operation schemas: `https://api.corsair.dev/md/integrations/<dotted.operatio
 - `gmail.api.messages.list` input: `{ userId?, q?, maxResults?, pageToken?, labelIds?, includeSpamTrash? }` → `{ messages?: GmailMessage[], nextPageToken?, resultSizeEstimate? }`. GmailMessage = `{ id, threadId, labelIds, snippet, historyId, internalDate, sizeEstimate, payload: { mimeType, filename, headers: {name,value}[], body: { attachmentId?, size?, data? }, parts: nested }, raw? }`.
 - `gmail.api.messages.send` input: `{ raw: string (REQUIRED), userId?, threadId? }`. **`raw` must be a full RFC 2822 MIME message, base64url-encoded** (`+`→`-`, `/`→`_`, no `=` padding). No structured to/subject/body fields. Pass `threadId` for replies.
 - `gmail.api.threads.get` input: `{ id: string (required), userId?, format?: "minimal"|"full"|"metadata", metadataHeaders?: string[] }` → `{ id, snippet, historyId, messages: GmailMessage[] }`.
-- `gmail.db.messages.search` filterable fields: `entity_id, id, threadId, snippet, historyId, internalDate, sizeEstimate, raw, subject, body, from, to, createdAt`. String ops: `equals|contains|startsWith|endsWith|in`; number: `equals|gt|gte|lt|lte|in`; date: `equals|before|after|between`. Call shape: `{ data: { field: { op: value } }, limit, offset }`. Note: cached rows have flattened `subject/from/to/body` columns (richer than the thread cache).
+- `gmail.db.messages.search` filterable fields (per schema): `entity_id, id, threadId, snippet, ..., subject, body, from, to, createdAt`. String ops: `equals|contains|startsWith|endsWith|in`; number/date ops too. Call shape: `{ data: { field: { op: value } }, limit, offset }`.
+  - **VERIFIED LIVE (2026-06-12 day 3) — the cache does NOT store content.** A real returned row is `{ id: <corsair-uuid>, entity_id: "<gmail message id>", entity_type: "messages", account_id, created_at, updated_at, data: { id, threadId, createdAt } }`. The `data` blob holds ONLY `id`/`threadId`/`createdAt` — there is **no** subject/from/snippet/body, even though those are listed as filterable fields. So `db.messages.search` is only useful to enumerate message **refs** (`entity_id` = gmail message id, `data.threadId` = thread id). Filtering by subject/from "succeeds" but matches nothing (columns unpopulated).
+  - **To render an inbox** you must hydrate each ref via `gmail.api.messages.get` (`format: "metadata"`, returns `snippet`, `internalDate`, `labelIds`, and `payload.headers` incl. From/Subject/Date. **GOTCHA: do NOT pass `metadataHeaders` — when present, Corsair returns `payload.headers: undefined`; omit it and you get all ~28 headers.**). See `lib/gmail.ts` `listInboxMessages` + `hydrate`. For **search**, use `gmail.api.messages.list` with Gmail `q` syntax to get refs, then hydrate. Default inbox uses `messages.list` with `labelIds: ["INBOX"]`.
 - `gmail.db.threads.search` filterable: `entity_id, id, snippet, historyId, createdAt` only — message cache is more useful for inbox lists.
 
 ### Verified calendar operation schemas (fetched 2026-06-12)

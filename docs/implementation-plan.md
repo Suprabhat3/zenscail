@@ -113,7 +113,10 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** the example use case works: "Send a calendar invite to friend@corsair.dev at 9 AM next Thursday. Send him an email too…"
 
-## Phase 6 — Realtime webhooks (bonus)
+## Phase 6 — Realtime webhooks (bonus) — ⏸️ DEFERRED (2026-06-12, day 3)
+
+> **Status: deliberately deferred by user decision.** Still blocked on the unknown Corsair webhook registration + signature-verification mechanism (not in `corsair-reference.md`). The design below is unchanged and remains the intended approach. See handoff.md "Phase 6 — deferred (read before picking it up)" for the exact unknowns and the resolution path (fetch live Corsair docs / ask support, then append to corsair-reference.md). Nothing was stubbed — clean start. Phase 7's classifier currently runs on render/refresh; once webhooks land they should also trigger `classifyMessages` for new mail.
+
 
 1. `app/api/webhooks/corsair/route.ts` receives `gmail.webhooks.messageChanged` and `googlecalendar.webhooks.onEventChanged`. Check the Corsair dashboard/docs for the exact registration mechanism and signature verification (this detail isn't in our cached reference — fetch `https://docs.corsair.dev/app/direct-execution.md` neighbors or the dashboard when implementing).
 2. Local dev: ngrok tunnel (`ngrok http 3000`) → register the tunnel URL as webhook target.
@@ -123,7 +126,10 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** new email appears in the inbox within seconds, no manual refresh.
 
-## Phase 7 — AI priority filtering (bonus)
+## Phase 7 — AI priority filtering (bonus) — ✅ DONE (2026-06-12, day 3)
+
+> **Implemented via backfill-on-render** (the webhook trigger from Phase 6 is deferred). `EmailMeta` model + `lib/ai/classify.ts` (`classifyMessages` / `getPriorities`, `cheapModel` + `generateObject`, best-effort no-throw), badge + "Urgent first" toggle in `/mail`. Needs `OPENAI_API_KEY` or a BYOK key to classify. Details in handoff.md day-3 update.
+
 
 1. Prisma: `EmailMeta` (gmailMessageId, userId, priority: `urgent|normal|low`, reason, createdAt).
 2. Classifier in `lib/ai/classify.ts`: cheap model (cloud: `gpt-4.1-mini`/nano; BYOK: cheapest model of their provider) with `generateObject` → `{ priority, reason }` from subject + first ~1k chars of body.

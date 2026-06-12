@@ -35,22 +35,43 @@ async function main() {
 
   const inst = corsair.instance(instanceId);
 
-  // Managed OAuth: Corsair hosts the Google OAuth app, so we don't need our
-  // own client_id/client_secret. "cautious" mode is fine for direct tenant.run()
-  // calls from our backend; revisit per-operation overrides before demo if MCP
-  // approval prompts get in the way.
+  // NOTE on OAuth: Corsair-managed OAuth (`authType: "managed_oauth"`) is NOT
+  // available for our developer account — the API returns
+  // `managed_oauth_not_configured` even though the catalog reports
+  // supportsManagedOAuth=true. So we bring our OWN Google Cloud OAuth app and
+  // register it as the plugin ROOT credentials. Requirements in Google Cloud:
+  //   - OAuth 2.0 Web client (the GOOGLE_CLIENT_ID/SECRET below)
+  //   - Gmail API + Google Calendar API enabled
+  //   - Authorized redirect URI = https://api.corsair.dev/oauth/callback
+  //   - test users added (while the consent screen is unverified)
+  // "cautious" mode is fine for direct tenant.run() calls from our backend.
+  const OAUTH_REDIRECT_URL = "https://api.corsair.dev/oauth/callback";
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    console.error(
+      "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET must be set in .env (your Google Cloud OAuth web client).",
+    );
+    process.exit(1);
+  }
+
   for (const pluginId of ["gmail", "googlecalendar"] as const) {
     const { plugin, created } = await inst.plugins.upsert(pluginId, {
       mode: "cautious",
       authType: "oauth_2",
-      useManaged: true,
     });
-    console.log(`${created ? "Installed" : "Updated"} plugin ${pluginId} (mode=${plugin.mode}, managed=${plugin.useManaged})`);
+    await inst.plugins.credentials.setRoot(pluginId, "client_id", clientId);
+    await inst.plugins.credentials.setRoot(pluginId, "client_secret", clientSecret);
+    await inst.plugins.credentials.setRoot(pluginId, "redirect_url", OAUTH_REDIRECT_URL);
+    console.log(
+      `${created ? "Installed" : "Updated"} plugin ${pluginId} (mode=${plugin.mode}) + root OAuth creds set`,
+    );
   }
 
   await inst.runtime.refresh();
 
-  console.log("\nDone. Add to .env:");
+  console.log(`\nGoogle OAuth redirect URI to whitelist in GCP: ${OAUTH_REDIRECT_URL}`);
+  console.log("Done. Add to .env:");
   console.log(`CORSAIR_INSTANCE_ID=${instanceId}`);
 }
 

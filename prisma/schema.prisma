@@ -37,6 +37,19 @@ model UserAiSettings {
   @@map("user_ai_settings")
 }
 
+model EmailMeta {
+  id              Int      @id @default(autoincrement())
+  userId          String   @map("user_id")
+  gmailMessageId  String   @map("gmail_message_id")
+  priority        String // "urgent" | "normal" | "low"
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, gmailMessageId])
+  @@index([userId, priority])
+  @@map("email_meta")
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime @map("expires_at")

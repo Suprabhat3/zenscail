@@ -30,18 +30,20 @@ export type GmailThread = {
   messages?: GmailMessage[];
 };
 
-/** Row shape of Corsair's gmail message cache (gmail.db.messages.search). */
-export type CachedMessage = {
-  id?: string;
-  threadId?: string;
-  snippet?: string;
-  subject?: string;
-  from?: string;
-  to?: string;
-  body?: string;
-  internalDate?: string | number | null;
-  labelIds?: string[];
-  createdAt?: string;
+/**
+ * Hydrated inbox row for the UI. NOTE: Corsair's gmail.db.messages.search cache
+ * only stores `{ entity_id, data: { id, threadId, createdAt } }` — it does NOT
+ * cache subject/from/snippet/body. So we get the message refs (id + threadId)
+ * and hydrate sender/subject/snippet via gmail.api.messages.get (format=metadata).
+ */
+export type InboxMessage = {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  snippet: string;
+  internalDate: number;
+  unread: boolean;
 };
 
 // --- Helpers ---
@@ -110,53 +112,62 @@ export function buildRawEmail(opts: {
 
 // --- Operations (all take a tenant scope from corsairTenant()) ---
 
-export async function searchCachedMessages(
-  t: TenantScope,
-  opts: { query?: string; limit?: number; offset?: number } = {},
-): Promise<CachedMessage[]> {
-  const { query, limit = 50, offset = 0 } = opts;
-  const run = (data?: Record<string, unknown>) =>
-    t.run<CachedMessage[] | { results?: CachedMessage[] }>(
-      "gmail.db.messages.search",
-      { ...(data ? { data } : {}), limit, offset },
-    );
+type MessageRef = { id: string; threadId: string };
 
-  let rows: CachedMessage[] = [];
-  if (query) {
-    // No OR operator in the filter language — run per-field and merge.
-    const [bySubject, byFrom, byBody] = await Promise.all([
-      run({ subject: { contains: query } }),
-      run({ from: { contains: query } }),
-      run({ body: { contains: query } }),
-    ]);
-    const seen = new Set<string>();
-    for (const result of [bySubject, byFrom, byBody]) {
-      if (!result.success) continue;
-      for (const row of normalizeRows(result.data)) {
-        if (row.id && !seen.has(row.id)) {
-          seen.add(row.id);
-          rows.push(row);
-        }
-      }
-    }
-  } else {
-    const result = await run();
-    if (result.success) rows = normalizeRows(result.data);
-  }
-
-  return rows.sort(
-    (a, b) => toMillis(b.internalDate ?? b.createdAt) - toMillis(a.internalDate ?? a.createdAt),
+/** Hydrate message refs into UI rows via gmail.api.messages.get (metadata only). */
+async function hydrate(t: TenantScope, refs: MessageRef[]): Promise<InboxMessage[]> {
+  const rows = await Promise.all(
+    refs.map(async (ref) => {
+      // NOTE: do NOT pass `metadataHeaders` — when present Corsair returns
+      // `payload.headers: undefined`. Omitting it returns all headers.
+      const res = await t.run<GmailMessage>("gmail.api.messages.get", {
+        id: ref.id,
+        format: "metadata",
+      });
+      if (!res.success) return null;
+      const m = res.data;
+      return {
+        id: ref.id,
+        threadId: m.threadId ?? ref.threadId,
+        from: header(m.payload, "From"),
+        subject: header(m.payload, "Subject"),
+        snippet: m.snippet ?? "",
+        internalDate: toMillis(m.internalDate),
+        unread: (m.labelIds ?? []).includes("UNREAD"),
+      } satisfies InboxMessage;
+    }),
   );
+  return rows.filter((r): r is InboxMessage => r !== null);
 }
 
-function normalizeRows(
-  data: CachedMessage[] | { results?: CachedMessage[] } | unknown,
-): CachedMessage[] {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object" && Array.isArray((data as { results?: CachedMessage[] }).results)) {
-    return (data as { results: CachedMessage[] }).results;
-  }
-  return [];
+/**
+ * List inbox messages (or search results), hydrated with sender/subject/snippet.
+ * Returns `ok: false` when the tenant isn't connected (caller redirects to /connect).
+ */
+export async function listInboxMessages(
+  t: TenantScope,
+  opts: { query?: string; limit?: number } = {},
+): Promise<{ ok: boolean; messages: InboxMessage[] }> {
+  const { query, limit = 25 } = opts;
+  // The db cache has no searchable content columns, so we list message refs via
+  // the API: Gmail `q` for search, INBOX label for the default view.
+  const input = query
+    ? { q: query, maxResults: limit }
+    : { labelIds: ["INBOX"], maxResults: limit };
+  const res = await t.run<{ messages?: { id?: string; threadId?: string }[] }>(
+    "gmail.api.messages.list",
+    input,
+  );
+  if (!res.success) return { ok: false, messages: [] };
+
+  const refs: MessageRef[] = (res.data?.messages ?? [])
+    .filter((m): m is { id: string; threadId?: string } => Boolean(m.id))
+    .map((m) => ({ id: m.id, threadId: m.threadId ?? "" }));
+
+  const messages = (await hydrate(t, refs)).sort(
+    (a, b) => b.internalDate - a.internalDate,
+  );
+  return { ok: true, messages };
 }
 
 function toMillis(value: string | number | null | undefined): number {

@@ -1,4 +1,25 @@
-# Handoff — ZenScail (written 2026-06-12, end of day 1; updated 2026-06-12 day 2)
+# Handoff — ZenScail (written 2026-06-12, end of day 1; updated 2026-06-12 day 2; updated 2026-06-12 day 3)
+
+> **Day-3 update: Phase 7 (AI priority filtering) is code-complete via the backfill-on-refresh path. Phase 6 (webhooks) was deliberately DEFERRED by user decision — see "Phase 6 — deferred (read before picking it up)" below for the full context the next agent needs.**
+>
+> - **Phase 7 (priority filtering):** `EmailMeta` model added to `prisma/schema.prisma` (`userId` + `gmailMessageId` unique, `priority` urgent|normal|low, `reason`) and pushed to Neon via `prisma db push`. `lib/ai/classify.ts`: `classifyMessages(userId, messages, {limit=15})` uses `registry.ts`'s `cheapModel` + `generateObject` (zod schema) to classify unclassified messages and persist them — fully best-effort (returns 0 and never throws when no model is configured or an LLM call fails). `getPriorities(userId, ids)` reads them back. Trigger is backfill-on-render: `app/(app)/mail/page.tsx` calls `classifyMessages` then `getPriorities` on each inbox render (bounded to 15 new classifications/render so it self-completes over a few page loads). UI: `components/mail/PriorityBadge.tsx` (urgent=red / normal / low) rendered per row; **"Urgent first"** toggle in the inbox header (`/mail?view=urgent`) sorts by priority. `zod@4` was added as a direct dep (the AI SDK needs it for `generateObject` schemas). **Classifier needs a model:** works once `OPENAI_API_KEY` is set (cloud cheap = `gpt-5-mini`) OR a BYOK key is configured; until then it silently classifies nothing and the inbox just shows no badges.
+> - **Live verification:** dev server was started (`pnpm dev`, http://localhost:3000) and the user was walked through sign up → /connect → Google OAuth → /mail. (Record the outcome here once confirmed — was the inbox populated with real Gmail data? If yes, Phase 2 is finally verified end-to-end and the `CachedMessage` shape in `lib/gmail.ts` can be tightened against real rows.)
+>
+> ## Inbox hydration fix (day 3) — cache has no content, must hydrate
+>
+> After connecting, the inbox rendered every row as "(unknown sender)/(no subject)" and thread links were `/mail/thread/undefined`. Root cause: `gmail.db.messages.search` cache rows only contain `{ entity_id (=gmail msg id), data: { id, threadId, createdAt } }` — NO subject/from/snippet/body (corrected in corsair-reference.md; the old "flattened columns" note was wrong). Fixed in `lib/gmail.ts`: removed `CachedMessage`/`searchCachedMessages`, added `InboxMessage` + `listInboxMessages` which lists refs via `gmail.api.messages.list` (`labelIds:["INBOX"]` default, or Gmail `q` for search) then **hydrates** each via `gmail.api.messages.get` (format=metadata → From/Subject/snippet/date/labels). `app/(app)/mail/page.tsx` now uses `listInboxMessages` ({ok, messages}); `classify.ts` takes `InboxMessage` (uses `snippet`, no body). **Perf note:** the inbox now fires ~25 parallel `messages.get` calls per render (+ up to 15 classifier LLM calls on first load) — acceptable for demo but a candidate for caching hydrated metadata into our own Postgres later. Thread view was already correct once a real threadId is passed.
+>
+> ## OAuth fix (day 3) — Corsair Gmail/Calendar now uses OUR Google app
+>
+> The `/connect` flow was erroring with **"OAuth client_id is not set for gmail."** Root cause: Corsair-managed OAuth is NOT available for our dev account (`managed_oauth_not_configured`), and the old provisioning passed `useManaged: true` which silently no-ops. **Fixed by bringing our own Google Cloud OAuth web client** (the existing `GOOGLE_CLIENT_ID/SECRET` in `.env`) and registering it as the plugin **root credentials** via `setRoot` in `scripts/provision-corsair.mts` (re-run it; root creds verified SET on both plugins). Full detail in corsair-reference.md "OAuth (RESOLVED...)". **Manual step the user owns in Google Cloud console:** enable Gmail API + Calendar API, add redirect URI `https://api.corsair.dev/oauth/callback`, add test users on the (unverified) consent screen. Until that propagates, the connect link will still fail. Email/password app login is KEPT (the user chose the root-creds path, not Google-only login). Re-verify `/connect` → Google consent → `/mail` once GCP is configured.
+>
+> ## Phase 6 — deferred (read before picking it up)
+>
+> Webhooks + SSE were intentionally left unbuilt. The blocker is unchanged: **the exact Corsair webhook registration + signature-verification mechanism is not in our cached `corsair-reference.md`.** What we know / what the next agent must do:
+> - Ops exist: `gmail.webhooks.messageChanged` and `googlecalendar.webhooks.onEventChanged` (listed in corsair-reference.md). The tenant credential field `webhook_signature` exists and is almost certainly part of verification.
+> - **Unknown:** how a webhook target URL is registered (SDK call vs. Corsair dashboard), the payload shape, and how to verify the signature. Resolve by fetching live Corsair docs (`https://docs.corsair.dev/app/...`, neighbors of direct-execution) or asking Corsair support — then APPEND findings to `corsair-reference.md`.
+> - **Planned design (from implementation-plan.md Phase 6, still the intended approach):** `app/api/webhooks/corsair/route.ts` receives events → upsert an `InboxEvent` row keyed by tenant → push to clients via a per-user **SSE** endpoint (`app/api/stream/route.ts`) that `/mail` + `/calendar` subscribe to and re-fetch the `db.*` feed on. Local dev needs an ngrok tunnel (`ngrok http 3000`) registered as the webhook target. The same webhook should also trigger `classifyMessages` for newly-arrived mail (Phase 7's real-time trigger — right now Phase 7 only runs on render/refresh).
+> - Nothing for Phase 6 was stubbed — there is no half-built SSE/route handler to clean up. It's a clean start.
 
 > **Day-2 update: Phases 3, 4, 5 and 8 are code-complete; build passes.** Corsair instance re-verified healthy. **The DB has 0 users** — the manual Phase 2 verification (sign up → /connect → Google OAuth → /mail) was never done and still blocks live verification of everything downstream. Run `pnpm exec tsx --env-file=.env scripts/check-tenant-connectivity.mts` to re-check connectivity any time.
 >
@@ -33,8 +54,8 @@ AI-powered Gmail + Google Calendar manager for a hackathon. Tech: Next.js 16.2.9
 | 3 Calendar UI | ✅ code-complete (day 2), untested live |
 | 4 LLM provider layer (BYOK + cloud) | ✅ code-complete (day 2); `OPENAI_API_KEY` still unset |
 | 5 Agent chat (Corsair MCP + Vercel AI SDK) | ✅ code-complete (day 2), untested live |
-| 6 Webhooks + SSE | ⬜ blocked on registration mechanism |
-| 7 Priority filtering | ⬜ |
+| 6 Webhooks + SSE | ⏸️ DEFERRED by user (day 3) — blocked on registration mechanism; see "Phase 6 — deferred" above |
+| 7 Priority filtering | ✅ code-complete (day 3); needs an LLM key to actually classify |
 | 8 Keyboard shortcuts | ✅ code-complete (day 2) |
 | 9 Polish + README | ⬜ |
 
