@@ -39,8 +39,6 @@ export default async function MailPage({
   if (!result.ok) redirect("/connect");
   let messages = result.messages;
 
-  // Backfill priority classification for any unclassified messages (best-effort,
-  // bounded per render so it never blocks the inbox for long), then attach.
   await classifyMessages(userId, messages);
   const priorities = await getPriorities(
     userId,
@@ -57,15 +55,16 @@ export default async function MailPage({
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <h1 className="font-serif text-2xl">Inbox</h1>
-        <div className="flex items-center gap-3">
+        <h1 className="font-serif text-2xl font-normal tracking-tight text-(--ink)">Inbox</h1>
+        <div className="flex items-center gap-2">
           <Link
             href={urgentFirst ? "/mail" : "/mail?view=urgent"}
-            className={`rounded-lg border px-3 py-1.5 text-sm ${
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
               urgentFirst
-                ? "border-red-500/40 bg-red-500/10 text-red-300"
-                : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+                ? "border-(--accent)/40 bg-(--accent-soft) text-(--accent-deep)"
+                : "border-(--line) text-(--ink-soft) hover:border-(--ink) hover:text-(--ink)"
             }`}
           >
             Urgent first
@@ -76,17 +75,17 @@ export default async function MailPage({
               name="q"
               defaultValue={q}
               placeholder="Search mail…"
-              className="w-64 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none"
+              className="w-56 rounded-full border border-(--line) bg-(--paper) px-4 py-1.5 text-sm text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
             />
           </form>
           <form action={refreshInbox}>
-            <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800">
+            <button className="rounded-full border border-(--line) px-3 py-1.5 text-sm text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)">
               Refresh
             </button>
           </form>
           <Link
             href="/mail/compose"
-            className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-950 hover:bg-white"
+            className="rounded-full bg-(--ink) px-4 py-1.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)"
           >
             Compose
           </Link>
@@ -94,61 +93,72 @@ export default async function MailPage({
       </div>
 
       {q && (
-        <p className="mt-3 text-sm text-neutral-400">
-          Results for “{q}” —{" "}
-          <Link href="/mail" className="underline hover:text-neutral-200">
+        <p className="mt-3 text-sm text-(--muted)">
+          Results for &ldquo;{q}&rdquo; —{" "}
+          <Link href="/mail" className="text-(--accent) underline hover:text-(--accent-deep)">
             clear
           </Link>
         </p>
       )}
 
-      <ul className="mt-6 divide-y divide-neutral-800 rounded-xl border border-neutral-800 bg-neutral-900">
+      {/* Mail list */}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
         {messages.length === 0 && (
-          <li className="px-4 py-12 text-center text-sm text-neutral-500">
+          <div className="px-4 py-16 text-center text-sm text-(--muted)">
             {q ? "No messages match your search." : "No messages yet. Hit Refresh to sync your inbox."}
-          </li>
+          </div>
         )}
-        {messages.map((m) => (
-          <li key={m.id} className="group flex items-center gap-3 px-4 py-3 hover:bg-neutral-800/50">
-            <Link
-              href={`/mail/thread/${m.threadId}`}
-              data-thread-link
-              className="min-w-0 flex-1 rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-2">
-                  {(() => {
-                    const p = m.id ? priorities.get(m.id) : undefined;
-                    return p ? <PriorityBadge priority={p.priority} reason={p.reason} /> : null;
-                  })()}
-                  <span className="truncate text-sm font-medium text-neutral-200">
-                    {m.from || "(unknown sender)"}
+        <ul className="divide-y divide-(--line-soft)">
+          {messages.map((m) => (
+            <li key={m.id} className="group relative flex items-center gap-3 px-5 py-3.5 transition hover:bg-(--bg)">
+              <Link
+                href={`/mail/thread/${m.threadId}`}
+                data-thread-link
+                className="min-w-0 flex-1 focus:outline-none"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-2">
+                    {(() => {
+                      const p = m.id ? priorities.get(m.id) : undefined;
+                      return p ? <PriorityBadge priority={p.priority} reason={p.reason} /> : null;
+                    })()}
+                    <span className="truncate text-sm font-semibold text-(--ink)">
+                      {m.from || "(unknown sender)"}
+                    </span>
                   </span>
-                </span>
-                <span className="shrink-0 text-xs text-neutral-500">
-                  {formatDate(m.internalDate)}
-                </span>
+                  <span className="shrink-0 text-xs text-(--muted)">
+                    {formatDate(m.internalDate)}
+                  </span>
+                </div>
+                <p className="truncate text-sm text-(--ink-soft)">{m.subject || "(no subject)"}</p>
+                <p className="truncate text-xs text-(--muted)">{m.snippet}</p>
+              </Link>
+              <div className="hidden shrink-0 gap-1 group-hover:flex">
+                <form action={archiveMessageAction}>
+                  <input type="hidden" name="id" value={m.id} />
+                  <button
+                    data-row-action="archive"
+                    title="Archive"
+                    className="rounded-full border border-(--line) px-2.5 py-1 text-xs text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+                  >
+                    Archive
+                  </button>
+                </form>
+                <form action={trashMessageAction}>
+                  <input type="hidden" name="id" value={m.id} />
+                  <button
+                    data-row-action="trash"
+                    title="Trash"
+                    className="rounded-full border border-(--line) px-2.5 py-1 text-xs text-(--accent) transition hover:bg-(--accent-soft)"
+                  >
+                    Trash
+                  </button>
+                </form>
               </div>
-              <p className="truncate text-sm text-neutral-300">{m.subject || "(no subject)"}</p>
-              <p className="truncate text-xs text-neutral-500">{m.snippet}</p>
-            </Link>
-            <div className="hidden shrink-0 gap-1 group-hover:flex">
-              <form action={archiveMessageAction}>
-                <input type="hidden" name="id" value={m.id} />
-                <button data-row-action="archive" title="Archive" className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
-                  Archive
-                </button>
-              </form>
-              <form action={trashMessageAction}>
-                <input type="hidden" name="id" value={m.id} />
-                <button data-row-action="trash" title="Trash" className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
-                  Trash
-                </button>
-              </form>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

@@ -42,7 +42,7 @@ export function UserMenu({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-neutral-700 bg-neutral-800 text-sm font-medium text-neutral-200 transition hover:border-neutral-500"
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-(--line) bg-(--bg-deep) text-sm font-semibold text-(--ink) transition hover:border-(--ink)"
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -55,11 +55,11 @@ export function UserMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-10 z-50 w-60 rounded-xl border border-neutral-700 bg-neutral-900 py-2 shadow-xl shadow-black/40"
+          className="absolute right-0 top-10 z-50 w-60 rounded-xl border border-(--line) bg-(--paper) py-2 shadow-(--shadow-float)"
         >
-          <div className="border-b border-neutral-800 px-4 pb-2.5">
-            <p className="truncate text-sm font-medium text-neutral-100">{name}</p>
-            <p className="truncate text-xs text-neutral-500">{email}</p>
+          <div className="border-b border-(--line-soft) px-4 pb-2.5">
+            <p className="truncate text-sm font-semibold text-(--ink)">{name}</p>
+            <p className="truncate text-xs text-(--muted)">{email}</p>
           </div>
           <div className="py-1">
             {[
@@ -72,13 +72,13 @@ export function UserMenu({
                 href={item.href}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
+                className="block px-4 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)"
               >
                 {item.label}
               </Link>
             ))}
           </div>
-          <div className="border-t border-neutral-800 pt-1">
+          <div className="border-t border-(--line-soft) pt-1">
             <button
               role="menuitem"
               onClick={async () => {
@@ -86,7 +86,7 @@ export function UserMenu({
                 router.push("/");
                 router.refresh();
               }}
-              className="block w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-neutral-800"
+              className="block w-full px-4 py-2 text-left text-sm text-(--accent) transition hover:bg-(--accent-soft)"
             >
               Sign out
             </button>

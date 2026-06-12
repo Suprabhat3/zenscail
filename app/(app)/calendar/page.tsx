@@ -30,6 +30,19 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Deterministic color per event based on id hash
+const EVENT_COLORS = [
+  { bg: "bg-[#EAEFE4]", text: "text-[#4D5C40]", bar: "border-l-[3px] border-l-[var(--sage)]" },
+  { bg: "bg-[#F7ECD8]", text: "text-[#8A5F1E]", bar: "border-l-[3px] border-l-[var(--gold)]" },
+  { bg: "bg-(--accent-soft)", text: "text-(--accent-deep)", bar: "border-l-[3px] border-l-[var(--accent)]" },
+];
+
+function eventColor(id: string | null | undefined, idx: number) {
+  if (!id) return EVENT_COLORS[idx % 3];
+  const hash = Array.from(id).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return EVENT_COLORS[hash % 3];
+}
+
 export default async function CalendarPage({
   searchParams,
 }: {
@@ -50,7 +63,6 @@ export default async function CalendarPage({
     rangeStart: weekStart,
     rangeEnd: weekEnd,
   });
-  // A failed live read means the Calendar isn't connected — route to /connect.
   if (!ok) redirect("/connect");
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -69,86 +81,99 @@ export default async function CalendarPage({
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <h1 className="font-serif text-2xl">Calendar</h1>
-          <span className="text-sm text-neutral-400">{monthLabel}</span>
-        </div>
         <div className="flex items-center gap-3">
+          <h1 className="font-serif text-2xl font-normal tracking-tight text-(--ink)">Calendar</h1>
+          <span className="text-sm text-(--muted)">{monthLabel}</span>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
             <Link
               href={`/calendar?week=${weekOffset - 1}`}
-              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800"
+              className="rounded-full border border-(--line) px-3 py-1.5 text-sm text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
             >
               ←
             </Link>
             <Link
               href="/calendar"
-              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800"
+              className="rounded-full border border-(--line) px-3 py-1.5 text-sm text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
             >
               Today
             </Link>
             <Link
               href={`/calendar?week=${weekOffset + 1}`}
-              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800"
+              className="rounded-full border border-(--line) px-3 py-1.5 text-sm text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
             >
               →
             </Link>
           </div>
           <form action={refreshCalendar}>
-            <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800">
+            <button className="rounded-full border border-(--line) px-3 py-1.5 text-sm text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)">
               Refresh
             </button>
           </form>
           <Link
             href="/calendar/new"
-            className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-950 hover:bg-white"
+            className="rounded-full bg-(--ink) px-4 py-1.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)"
           >
             New event
           </Link>
         </div>
       </div>
 
+      {/* Week grid */}
       <div className="mt-6 grid grid-cols-7 gap-2">
         {days.map(({ date, events: dayEvents }) => {
           const isToday = ymd(date) === today;
           return (
             <div
               key={date.toISOString()}
-              className={`min-h-48 rounded-xl border bg-neutral-900 p-2 ${
-                isToday ? "border-neutral-500" : "border-neutral-800"
+              className={`min-h-48 rounded-2xl border bg-(--paper) p-2 transition ${
+                isToday
+                  ? "border-(--accent)/50 shadow-[0_0_0_2px_var(--accent-soft)]"
+                  : "border-(--line-soft)"
               }`}
             >
               <Link
                 href={`/calendar/new?date=${ymd(date)}`}
-                className="block rounded-lg px-1 py-0.5 hover:bg-neutral-800"
+                className="block rounded-lg px-1 py-0.5 transition hover:bg-(--bg-deep)"
                 title="New event on this day"
               >
-                <div className="text-xs uppercase tracking-wide text-neutral-500">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
                   {date.toLocaleDateString([], { weekday: "short" })}
                 </div>
-                <div className={`text-lg ${isToday ? "font-semibold text-neutral-50" : "text-neutral-300"}`}>
+                <div
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
+                    isToday
+                      ? "bg-(--accent) text-white"
+                      : "text-(--ink)"
+                  }`}
+                >
                   {date.getDate()}
                 </div>
               </Link>
-              <ul className="mt-2 space-y-1">
-                {dayEvents.map((e: CachedEvent) => (
-                  <li key={`${e.id}-${e.start?.dateTime ?? e.start?.date}`}>
-                    <Link
-                      href={`/calendar/event/${encodeURIComponent(e.id ?? "")}`}
-                      className="block rounded-lg border border-neutral-700/60 bg-neutral-800/60 px-2 py-1 hover:bg-neutral-700/60"
-                    >
-                      {!isAllDay(e) && (
-                        <div className="text-[10px] text-neutral-400">
-                          {formatTime(eventStartMillis(e))}
+              <ul className="mt-1.5 space-y-1">
+                {dayEvents.map((e: CachedEvent, idx: number) => {
+                  const color = eventColor(e.id, idx);
+                  return (
+                    <li key={`${e.id}-${e.start?.dateTime ?? e.start?.date}`}>
+                      <Link
+                        href={`/calendar/event/${encodeURIComponent(e.id ?? "")}`}
+                        className={`block rounded-lg px-2 py-1 text-xs transition hover:opacity-80 ${color.bg} ${color.text} ${color.bar}`}
+                      >
+                        {!isAllDay(e) && (
+                          <div className="mb-0.5 text-[10px] font-semibold opacity-70">
+                            {formatTime(eventStartMillis(e))}
+                          </div>
+                        )}
+                        <div className="truncate font-semibold leading-snug">
+                          {e.summary || "(no title)"}
                         </div>
-                      )}
-                      <div className="truncate text-xs text-neutral-200">
-                        {e.summary || "(no title)"}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );
@@ -156,8 +181,12 @@ export default async function CalendarPage({
       </div>
 
       {events.length === 0 && (
-        <p className="mt-8 text-center text-sm text-neutral-500">
-          No events this week. Hit Refresh to sync your calendar, or create one.
+        <p className="mt-8 text-center text-sm text-(--muted)">
+          No events this week. Hit Refresh to sync your calendar, or{" "}
+          <Link href="/calendar/new" className="text-(--accent) underline">
+            create one
+          </Link>
+          .
         </p>
       )}
     </div>

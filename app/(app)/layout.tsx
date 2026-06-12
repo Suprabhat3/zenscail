@@ -11,8 +11,8 @@ export default async function AppLayout({
   const session = await requireSession();
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-950 text-neutral-100">
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-800 bg-neutral-950/90 px-6 py-3 backdrop-blur">
+    <div className="flex min-h-screen flex-col bg-(--bg) text-(--ink)">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-(--line-soft) bg-(--bg)/85 px-6 py-3 backdrop-blur">
         <AppNav />
         <UserMenu
           name={session.user.name}

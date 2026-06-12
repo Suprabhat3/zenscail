@@ -27,46 +27,47 @@ export default async function ThreadPage({
   const lastMessageId = header(last?.payload, "Message-ID");
   const subject = header(messages[0]?.payload, "Subject") || "(no subject)";
   const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
-  // Reply goes to the last sender unless that's us — then to the original recipients.
   const replyTo =
     header(last?.payload, "Reply-To") ||
     (lastFrom.includes(session.user.email) ? header(last?.payload, "To") : lastFrom);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
-      <Link href="/mail" className="text-sm text-neutral-400 hover:text-neutral-200">
+      <Link href="/mail" className="text-sm text-(--muted) transition hover:text-(--ink)">
         ← Back to inbox
       </Link>
+
       <div className="mt-3 flex items-center justify-between gap-4">
-        <h1 className="font-serif text-2xl">{subject}</h1>
+        <h1 className="font-serif text-2xl font-normal tracking-tight text-(--ink)">{subject}</h1>
         <Link
           href={`/calendar/new?summary=${encodeURIComponent(subject)}&description=${encodeURIComponent(`From email thread with ${lastFrom}`)}`}
-          className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800"
+          className="shrink-0 rounded-full border border-(--line) px-3 py-1.5 text-sm text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
         >
-          Create event from this email
+          Create event
         </Link>
       </div>
 
+      {/* Messages */}
       <div className="mt-6 space-y-4">
         {messages.map((m) => {
           const bodies = extractBodies(m.payload);
           return (
-            <article key={m.id} className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-              <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="font-medium text-neutral-200">{header(m.payload, "From")}</span>
-                <span className="text-xs text-neutral-500">{header(m.payload, "Date")}</span>
+            <article key={m.id} className="overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
+              <div className="flex items-baseline justify-between gap-3 border-b border-(--line-soft) px-5 py-3 text-sm">
+                <span className="font-semibold text-(--ink)">{header(m.payload, "From")}</span>
+                <span className="text-xs text-(--muted)">{header(m.payload, "Date")}</span>
               </div>
-              <div className="mt-1 text-xs text-neutral-500">To: {header(m.payload, "To")}</div>
-              <div className="mt-4">
+              <div className="px-5 py-1 text-xs text-(--muted)">To: {header(m.payload, "To")}</div>
+              <div className="px-5 pb-5 pt-3">
                 {bodies.html ? (
                   <iframe
                     srcDoc={bodies.html}
                     sandbox=""
-                    className="h-96 w-full rounded-lg border border-neutral-800 bg-white"
+                    className="h-96 w-full rounded-xl border border-(--line-soft) bg-white"
                     title={`message-${m.id}`}
                   />
                 ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-neutral-300">
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-(--ink-soft)">
                     {bodies.text || m.snippet}
                   </pre>
                 )}
@@ -76,8 +77,9 @@ export default async function ThreadPage({
         })}
       </div>
 
-      <form action={sendMessage} className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-        <h2 className="text-sm font-medium text-neutral-300">Reply</h2>
+      {/* Reply form */}
+      <form action={sendMessage} className="mt-8 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) p-5 shadow-(--shadow-card)">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">Reply</h2>
         <input type="hidden" name="threadId" value={thread.id ?? id} />
         <input type="hidden" name="subject" value={replySubject} />
         <input type="hidden" name="inReplyTo" value={lastMessageId} />
@@ -86,16 +88,16 @@ export default async function ThreadPage({
           name="to"
           defaultValue={replyTo}
           required
-          className="mt-3 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm focus:border-neutral-400 focus:outline-none"
+          className="mt-3 w-full rounded-full border border-(--line) bg-(--bg) px-4 py-2.5 text-sm text-(--ink) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
         />
         <textarea
           name="body"
           rows={5}
           required
           placeholder="Write your reply…"
-          className="mt-3 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none"
+          className="mt-3 w-full rounded-xl border border-(--line) bg-(--bg) px-4 py-2.5 text-sm text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
         />
-        <button className="mt-3 rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-white">
+        <button className="mt-3 rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)">
           Send reply
         </button>
       </form>

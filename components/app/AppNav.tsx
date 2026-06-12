@@ -14,7 +14,7 @@ export function AppNav() {
 
   return (
     <nav className="flex items-center gap-1">
-      <Link href="/mail" className="mr-5 flex items-center gap-2 font-serif text-lg text-neutral-50">
+      <Link href="/mail" className="mr-5 flex items-center gap-2 font-serif text-lg text-(--ink)">
         <svg width="24" height="24" viewBox="0 0 30 30" aria-hidden="true">
           <path
             d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
@@ -23,7 +23,7 @@ export function AppNav() {
             strokeWidth="2.6"
             strokeLinecap="round"
           />
-          <circle cx="23.5" cy="7.5" r="3.4" fill="#f59e0b" />
+          <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
         </svg>
         ZenScail
       </Link>
@@ -33,10 +33,10 @@ export function AppNav() {
           <Link
             key={l.href}
             href={l.href}
-            className={`rounded-lg px-3 py-1.5 text-sm transition ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
               active
-                ? "bg-neutral-800 font-medium text-neutral-50"
-                : "text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100"
+                ? "bg-(--ink) text-(--bg)"
+                : "text-(--ink-soft) hover:bg-(--bg-deep) hover:text-(--ink)"
             }`}
           >
             {l.label}
