@@ -78,28 +78,47 @@ export function isAllDay(e: GcalEvent): boolean {
 // --- Operations (all take a tenant scope from corsairTenant()) ---
 
 /**
- * Read cached events and filter to [rangeStart, rangeEnd) in app code —
- * the events cache has no filterable start/end columns (see corsair-reference.md).
+ * List events in [rangeStart, rangeEnd) with full content.
+ *
+ * NOTE: like the Gmail message cache, `googlecalendar.db.events.search` only
+ * stores minimal refs (no summary/start/end) — reading content from it yields
+ * "(no title)" rows that also get filtered out (undefined start/end → millis 0).
+ * So we read directly from `api.events.getMany`, which returns full event
+ * objects and does the time-range filtering server-side. Returns `ok:false`
+ * when the tenant isn't connected (caller redirects to /connect).
  */
 export async function searchCachedEvents(
   t: TenantScope,
   opts: { rangeStart?: Date; rangeEnd?: Date; limit?: number } = {},
 ): Promise<CachedEvent[]> {
-  const result = await t.run<CachedEvent[] | { results?: CachedEvent[] }>(
-    "googlecalendar.db.events.search",
-    { limit: opts.limit ?? 500 },
+  const { messages: rows } = await listEvents(t, opts);
+  return rows;
+}
+
+export async function listEvents(
+  t: TenantScope,
+  opts: { rangeStart?: Date; rangeEnd?: Date; limit?: number } = {},
+): Promise<{ ok: boolean; messages: CachedEvent[] }> {
+  const result = await t.run<CachedEvent[] | { items?: CachedEvent[]; results?: CachedEvent[] }>(
+    "googlecalendar.api.events.getMany",
+    {
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: opts.limit ?? 250,
+      ...(opts.rangeStart ? { timeMin: opts.rangeStart.toISOString() } : {}),
+      ...(opts.rangeEnd ? { timeMax: opts.rangeEnd.toISOString() } : {}),
+    },
   );
-  if (!result.success) return [];
-  let rows = normalizeRows<CachedEvent>(result.data).filter(
-    (e) => e.status !== "cancelled",
-  );
-  if (opts.rangeStart || opts.rangeEnd) {
-    const min = opts.rangeStart?.getTime() ?? -Infinity;
-    const max = opts.rangeEnd?.getTime() ?? Infinity;
-    // Keep events that overlap the range at all.
-    rows = rows.filter((e) => eventEndMillis(e) > min && eventStartMillis(e) < max);
-  }
-  return rows.sort((a, b) => eventStartMillis(a) - eventStartMillis(b));
+  if (!result.success) return { ok: false, messages: [] };
+  const data = result.data as CachedEvent[] | { items?: CachedEvent[]; results?: CachedEvent[] };
+  const items =
+    !Array.isArray(data) && data && Array.isArray(data.items)
+      ? data.items
+      : normalizeRows<CachedEvent>(data);
+  const rows = items
+    .filter((e) => e.status !== "cancelled")
+    .sort((a, b) => eventStartMillis(a) - eventStartMillis(b));
+  return { ok: true, messages: rows };
 }
 
 /** Pull fresh events from the Google Calendar API into Corsair's cache. */

@@ -146,12 +146,16 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** full mail triage without touching the mouse.
 
-## Phase 9 — Polish & demo readiness
+## Phase 9 — Polish & demo readiness — 🟡 IN PROGRESS (2026-06-12, day 3)
 
-- Loading/empty/error states everywhere; re-auth redirect path tested (revoke + reconnect).
-- Rate-limit chat endpoint; cap `stopWhen` steps.
-- Seed/demo script and a rehearsed demo flow: sign in → connect → inbox triage (keyboard) → webhook live email → chat sends invite + email.
-- `README` update: env vars (`DATABASE_URL`, `CORSAIR_DEV_KEY`, `CORSAIR_INSTANCE_ID`, `OPENAI_API_KEY`, `APP_SECRET`, auth secrets), setup steps, provisioning script.
+- ✅ **Loading states:** `app/(app)/mail/loading.tsx` + `calendar/loading.tsx` (skeletons) — the inbox/calendar fire live API reads so suspense fallbacks matter.
+- ✅ **Error boundary:** `app/(app)/error.tsx` (client) — friendly "something went wrong" with Try again + Reconnect-account actions, covers the whole authed shell.
+- ✅ **Empty states:** already present in mail + calendar pages.
+- ✅ **Calendar content fix:** `lib/gcal.ts` `searchCachedEvents` read content (`summary`/`start`/`end`) from `googlecalendar.db.events.search`, which — like the Gmail cache — only stores minimal refs, so events rendered as "(no title)" and got filtered out. Replaced with `listEvents()` reading live from `api.events.getMany` (server-side time-range filter); `calendar/page.tsx` now redirects to `/connect` on `ok:false`. Mirrors the proven Gmail hydration fix.
+- ✅ **Chat rate/abuse guard:** message-count cap (100) + `stopWhen: stepCountIs(15)` already in `app/api/chat/route.ts`.
+- ✅ **README** rewritten: features, stack, env vars, GCP setup, provisioning, usage flow, structure, limitations.
+- ⬜ Re-auth redirect path tested live (revoke + reconnect).
+- ⬜ Seed/demo script and rehearsed demo flow.
 
 ---
 

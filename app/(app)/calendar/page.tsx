@@ -4,8 +4,7 @@ import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import {
-  searchCachedEvents,
-  refreshEvents,
+  listEvents,
   eventStartMillis,
   eventEndMillis,
   isAllDay,
@@ -47,18 +46,12 @@ export default async function CalendarPage({
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
-  let events = await searchCachedEvents(t, { rangeStart: weekStart, rangeEnd: weekEnd });
-
-  // Empty cache on first visit: try one refresh; if Calendar isn't connected
-  // yet this is where we find out and route to /connect.
-  if (events.length === 0) {
-    const refreshed = await refreshEvents(t, {
-      timeMin: new Date(weekStart.getTime() - 30 * 86400_000),
-      timeMax: new Date(weekEnd.getTime() + 90 * 86400_000),
-    });
-    if (!refreshed.success) redirect("/connect");
-    events = await searchCachedEvents(t, { rangeStart: weekStart, rangeEnd: weekEnd });
-  }
+  const { ok, messages: events } = await listEvents(t, {
+    rangeStart: weekStart,
+    rangeEnd: weekEnd,
+  });
+  // A failed live read means the Calendar isn't connected — route to /connect.
+  if (!ok) redirect("/connect");
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(weekStart);

@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ZenScail
 
-## Getting Started
+AI-powered Gmail + Google Calendar manager built on [Corsair](https://corsair.dev). Sign in, connect your Google account, and triage mail, manage your calendar, and drive both from a natural-language agent chat — with automatic AI priority filtering and keyboard-first navigation.
 
-First, run the development server:
+## Features
+
+- **Mail** — inbox, search, thread view, compose/reply, archive & trash, all backed by Gmail via Corsair.
+- **Calendar** — week grid, create/edit/delete events with attendee invites, free/busy availability, and "create event from email".
+- **AI priority filtering** — each incoming email is classified `urgent` / `normal` / `low` with a one-line reason; an "Urgent first" toggle reorders the inbox.
+- **Agent chat** — a streaming assistant with access to your Gmail + Calendar through the Corsair MCP server (e.g. _"Send a calendar invite to friend@corsair.dev at 9 AM next Thursday and email them I look forward to it"_).
+- **BYOK + cloud LLM** — bring your own API key for any major provider (OpenAI / Anthropic / Google) or use the built-in cloud tier. Keys are encrypted at rest.
+- **Keyboard shortcuts** — `c` compose, `r` reply, `e` archive, `#` trash, `j/k` navigate, `/` search, `g i|c|t` nav, `?` cheat-sheet.
+
+## Tech stack
+
+- **Next.js 16.2.9** (App Router, Turbopack, React 19) — note: middleware is `proxy.ts`; `params`/`searchParams` are Promises.
+- **Prisma 7 + Neon Postgres** (managed with `prisma db push`, **not** `migrate`).
+- **Better Auth** — email/password (+ optional Google social login).
+- **Corsair** (`@corsair-dev/app`) — Gmail + Google Calendar integration layer, one tenant per user.
+- **Vercel AI SDK** (`ai`, `@ai-sdk/openai|anthropic|google`, MCP) for classification + agent chat.
+- **Tailwind CSS v4.**
+
+## Prerequisites
+
+- Node 20+ and **pnpm** (this project uses pnpm exclusively — never npm).
+- A Neon (or any) Postgres database.
+- A Corsair developer key (https://app.corsair.dev/api-keys).
+- A Google Cloud OAuth web client (used as Corsair's root credentials for Gmail/Calendar access).
+- Optionally an OpenAI API key for the cloud LLM tier.
+
+## Environment variables
+
+Create a `.env` in the project root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Database
+DATABASE_URL=postgresql://...               # Neon connection string
+
+# Corsair
+CORSAIR_DEV_KEY=ch_...                       # developer key from app.corsair.dev/api-keys
+CORSAIR_INSTANCE_ID=...                      # printed by the provisioning script
+
+# Auth
+BETTER_AUTH_SECRET=...                       # random 32+ char secret
+BETTER_AUTH_URL=http://localhost:3000
+
+# Google OAuth (used as Corsair root creds for Gmail/Calendar;
+# also enables Google app login if you want it)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
+# LLM
+OPENAI_API_KEY=sk-...                        # cloud tier; optional if every user brings their own key
+APP_SECRET=...                               # 32+ char secret; encrypts users' BYOK keys at rest (AES-256-GCM)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Google Cloud console setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+In the GCP project backing `GOOGLE_CLIENT_ID/SECRET`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Enable the **Gmail API** and **Google Calendar API**.
+2. Add authorized redirect URIs:
+   - `https://api.corsair.dev/oauth/callback` (Corsair data access)
+   - `http://localhost:3000/api/auth/callback/google` (only if using Google app login)
+3. On the OAuth consent screen (testing mode), add your Google account(s) as **Test users**, or the connect flow returns `403 access_denied`.
 
-## Learn More
+## Setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm install                 # installs deps + runs prisma generate
+pnpm exec prisma db push     # push the schema to your database (do NOT use migrate — it resets the DB)
+pnpm provision:corsair       # create/verify the Corsair instance + gmail/googlecalendar plugins + root creds
+pnpm dev                     # http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`pnpm provision:corsair` is idempotent — it upserts the `zenscail` Corsair instance, installs the gmail + googlecalendar plugins (`mode: cautious`, `authType: oauth_2`), and registers your `GOOGLE_CLIENT_ID/SECRET` as plugin root credentials. Copy the printed instance id into `CORSAIR_INSTANCE_ID`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Usage flow
 
-## Deploy on Vercel
+1. Sign up / sign in at `/login`.
+2. You're routed to `/connect` — follow the Google OAuth link to connect Gmail + Calendar to your Corsair tenant.
+3. `/mail` populates with your inbox (priority badges appear once an LLM key is configured); `/calendar` shows your week.
+4. Configure your LLM under `/settings/ai` (provider + model + optional API key) to enable chat and priority filtering.
+5. Open `/chat` to drive everything by natural language.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Script | Purpose |
+|---|---|
+| `pnpm dev` | Start the dev server |
+| `pnpm build` | `prisma generate` + production build |
+| `pnpm provision:corsair` | Provision/verify the Corsair instance & plugins |
+| `pnpm exec prisma db push` | Sync the Prisma schema to the database |
+
+## Project structure
+
+- `app/(app)/` — authenticated shell: `mail`, `calendar`, `chat`, `settings`, `connect`.
+- `app/api/auth/[...all]` — Better Auth handler · `app/api/chat` — streaming agent chat.
+- `lib/corsair.ts` · `lib/tenant.ts` — Corsair client + per-user tenant mapping.
+- `lib/gmail.ts` · `lib/gcal.ts` — typed Gmail / Calendar operation helpers.
+- `lib/ai/` — provider registry, model lists, and the priority classifier.
+- `scripts/provision-corsair.mts` — one-time Corsair provisioning (ESM, `.mts`).
+- `docs/` — implementation plan, handoff notes, and verified Corsair API reference (read these before extending).
+
+## Notes & limitations
+
+- **Realtime webhooks (live inbox push) are not implemented** — the inbox and priority classifier run on page load / Refresh. See `docs/handoff.md` ("Phase 6 — deferred") for the design and the open questions.
+- Corsair's `db.*` caches store only minimal refs (no message/event content), so mail and calendar read content live via `*.api.*`. This is correct but means ~25 parallel `messages.get` calls per inbox render — fine for a demo, a caching candidate for production.
+- Schema changes use `prisma db push`, never `migrate` (migrate wants to reset the DB and would wipe data).
