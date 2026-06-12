@@ -1,21 +1,22 @@
 // Curated model lists per provider, shared by the settings UI and registry.
 // Cheap model (last entry's `cheap` flag) is used by the priority classifier.
 
-export type AiProvider = "openai" | "anthropic" | "google";
+export type AiProvider = "openai" | "anthropic" | "google" | "groq";
 
 export const PROVIDERS: { id: AiProvider; label: string }[] = [
   { id: "openai", label: "OpenAI" },
   { id: "anthropic", label: "Anthropic" },
   { id: "google", label: "Google" },
+  { id: "groq", label: "Groq" },
 ];
 
 export const MODELS: Record<AiProvider, { id: string; label: string; cheap?: boolean }[]> = {
   openai: [
-    { id: "gpt-5.2", label: "GPT-5.2" },
-    { id: "gpt-5.2-pro", label: "GPT-5.2 Pro" },
-    { id: "gpt-5-mini", label: "GPT-5 mini", cheap: true },
-    { id: "gpt-4.1", label: "GPT-4.1" },
-    { id: "gpt-4.1-mini", label: "GPT-4.1 mini", cheap: true },
+    { id: "gpt-5.4", label: "GPT-5.4" },
+    { id: "gpt-5.3-codex", label: "GPT-5.3 codex" },
+    { id: "gpt-5.4-mini", label: "GPT-5.4 mini" },
+    { id: "gpt-5.4-nano", label: "GPT-5.4 nano", cheap: true },
+    { id: "gpt-5-nano", label: "GPT-5 nano", cheap: true }
   ],
   anthropic: [
     { id: "claude-fable-5", label: "Claude Fable 5" },
@@ -29,11 +30,19 @@ export const MODELS: Record<AiProvider, { id: string; label: string; cheap?: boo
     { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
     { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", cheap: true },
   ],
+  groq: [
+    { id: "groq/compound", label: "Groq Compound", cheap: true },
+    { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" },
+    { id: "openai/gpt-oss-20b", label: "GPT-OSS 20B" },
+    { id: "groq/compound-mini", label: "Groq Compound Mini", cheap: true },
+    { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile" },
+    { id: "qwen/qwen3-32b", label: "Qwen 3 32B" },
+  ],
 };
 
 /** Cloud (default) tier — uses our own OPENAI_API_KEY. */
-export const CLOUD_MODEL = "gpt-5.2";
-export const CLOUD_CHEAP_MODEL = "gpt-5-mini";
+export const CLOUD_MODEL = "gpt-5.4";
+export const CLOUD_CHEAP_MODEL = "gpt-5.4-nano";
 
 export function isValidModel(provider: AiProvider, model: string): boolean {
   return MODELS[provider]?.some((m) => m.id === model) ?? false;
