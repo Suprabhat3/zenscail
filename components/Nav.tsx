@@ -38,7 +38,7 @@ export function Nav() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {session ? (
-            <Link className="btn btn-primary btn-sm" href="/mail">
+            <Link className="btn btn-primary btn-sm" href="/dashboard">
               Open app →
             </Link>
           ) : (

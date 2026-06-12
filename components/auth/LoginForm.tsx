@@ -32,7 +32,7 @@ export function LoginForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawNext = searchParams.get("next");
-  const next = rawNext && rawNext.startsWith("/") ? rawNext : "/mail";
+  const next = rawNext && rawNext.startsWith("/") ? rawNext : "/dashboard";
 
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [name, setName] = useState("");

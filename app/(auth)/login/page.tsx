@@ -13,7 +13,7 @@ export default async function LoginPage({
 }) {
   const { mode, next } = await searchParams;
   const session = await getSession();
-  if (session) redirect(next && next.startsWith("/") ? next : "/mail");
+  if (session) redirect(next && next.startsWith("/") ? next : "/dashboard");
 
   const googleEnabled = Boolean(
     process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,

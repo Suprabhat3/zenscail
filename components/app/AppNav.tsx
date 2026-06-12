@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
+  { href: "/dashboard", label: "Today" },
   { href: "/mail", label: "Mail" },
   { href: "/calendar", label: "Calendar" },
-  { href: "/chat", label: "Chat" },
 ];
 
 export function AppNav() {
@@ -14,7 +14,7 @@ export function AppNav() {
 
   return (
     <nav className="flex items-center gap-1">
-      <Link href="/mail" className="mr-5 flex items-center gap-2 font-serif text-lg text-(--ink)">
+      <Link href="/dashboard" className="mr-5 flex items-center gap-2 font-serif text-lg text-(--ink)">
         <svg width="24" height="24" viewBox="0 0 30 30" aria-hidden="true">
           <path
             d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"

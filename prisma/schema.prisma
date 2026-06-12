@@ -50,6 +50,22 @@ model EmailMeta {
   @@map("email_meta")
 }
 
+model DailyBrief {
+  id          Int      @id @default(autoincrement())
+  userId      String   @map("user_id")
+  date        String // "YYYY-MM-DD" in the user's day (server local)
+  headline    String
+  overview    String // markdown body
+  actionItems Json     @map("action_items") // BriefActionItem[] — see lib/ai/brief.ts
+  events      Json // BriefEvent[] — today's calendar snapshot at generation time
+  stats       Json // { emailsReviewed, urgentCount, meetingsToday }
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, date])
+  @@map("daily_brief")
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime @map("expires_at")

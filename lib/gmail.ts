@@ -202,6 +202,11 @@ export async function trashMessage(t: TenantScope, id: string) {
   return t.run("gmail.api.messages.trash", { id });
 }
 
+/** Clear the UNREAD label from every message in a thread. */
+export async function markThreadRead(t: TenantScope, id: string) {
+  return t.run("gmail.api.threads.modify", { id, removeLabelIds: ["UNREAD"] });
+}
+
 export async function modifyMessage(
   t: TenantScope,
   id: string,

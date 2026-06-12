@@ -1,17 +1,20 @@
 type Priority = "urgent" | "normal" | "low";
 
-const STYLES: Record<Priority, { label: string; className: string }> = {
+const STYLES: Record<Priority, { label: string; className: string; dot: string }> = {
   urgent: {
     label: "Urgent",
-    className: "border-red-500/40 bg-red-500/10 text-red-300",
+    className: "bg-(--accent-soft) text-(--accent-deep)",
+    dot: "bg-(--accent)",
   },
   normal: {
     label: "Normal",
-    className: "border-neutral-600 bg-neutral-800 text-neutral-300",
+    className: "bg-[#EAEFE4] text-[#4D5C40]",
+    dot: "bg-(--sage)",
   },
   low: {
     label: "Low",
-    className: "border-neutral-700 bg-neutral-900 text-neutral-500",
+    className: "bg-(--bg-deep) text-(--muted)",
+    dot: "bg-(--line)",
   },
 };
 
@@ -26,8 +29,9 @@ export function PriorityBadge({
   return (
     <span
       title={reason ?? undefined}
-      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${s.className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ${s.className}`}
     >
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
       {s.label}
     </span>
   );
