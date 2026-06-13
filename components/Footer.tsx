@@ -4,7 +4,7 @@ export function Footer() {
       <div className="wrap">
         <div className="footer-grid">
           <div>
-            <a className="logo" href="#top">
+            <a className="logo" href="/">
               <svg width="24" height="24" viewBox="0 0 30 30" aria-hidden="true">
                 <path
                   d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
@@ -58,31 +58,35 @@ export function Footer() {
           <div>
             <h4>Product</h4>
             <ul>
-              <li><a href="#features">Features</a></li>
-              <li><a href="#demo">Live demo</a></li>
-              <li><a href="#pricing">Pricing</a></li>
-              <li><a href="#join">Waitlist</a></li>
+              <li><a href="/#features">Features</a></li>
+              <li><a href="/#demo">Live demo</a></li>
+              <li><a href="/#pricing">Pricing</a></li>
+              <li><a href="/#join">Waitlist</a></li>
             </ul>
           </div>
           <div>
             <h4>Company</h4>
             <ul>
-              <li><a href="#top">About</a></li>
-              <li><a href="#top">Blog</a></li>
-              <li><a href="#top">Careers</a></li>
+              <li><a href="/about">About</a></li>
+              <li><a href="/founder">Founder</a></li>
+              <li><a href="/contact">Contact</a></li>
             </ul>
           </div>
           <div>
             <h4>Trust</h4>
             <ul>
-              <li><a href="#top">Privacy</a></li>
-              <li><a href="#top">Security</a></li>
-              <li><a href="#top">Terms</a></li>
+              <li><a href="/privacy">Privacy</a></li>
+              <li><a href="/security">Security</a></li>
+              <li><a href="/terms">Terms</a></li>
+              <li><a href="/cookies">Cookies</a></li>
             </ul>
           </div>
         </div>
         <div className="footer-base">
-          <span>&copy; 2026 ZenScail. All rights reserved.</span>
+          <span>
+            &copy; 2026 ZenScail. All rights reserved. &middot;{" "}
+            <a href="mailto:team@zenscail.com">team@zenscail.com</a>
+          </span>
           <span>Made with care, before 9 AM.</span>
         </div>
       </div>

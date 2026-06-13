@@ -18,7 +18,7 @@ export function Nav() {
   return (
     <nav className={`nav${scrolled ? " scrolled" : ""}`}>
       <div className="wrap nav-inner">
-        <a className="logo" href="#top">
+        <a className="logo" href="/">
           <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
             <path
               d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
@@ -32,9 +32,9 @@ export function Nav() {
           <span>ZenScail</span>
         </a>
         <div className="nav-links">
-          <a href="#features">Features</a>
-          <a href="#demo">See it work</a>
-          <a href="#pricing">Pricing</a>
+          <a href="/#features">Features</a>
+          <a href="/#demo">See it work</a>
+          <a href="/#pricing">Pricing</a>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {session ? (
