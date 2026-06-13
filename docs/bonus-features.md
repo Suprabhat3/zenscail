@@ -31,7 +31,11 @@ Build all eight, prioritized by demo impact. Ship in priority order so we always
 
 ---
 
-## Feature 1 — Command palette (⌘K) 🥇
+## Feature 1 — Command palette (⌘K) 🥇 — ✅ SHIPPED
+
+> **Done.** `components/command/CommandProvider.tsx` (shared open-state, mirrors ChatProvider) + `components/command/CommandPalette.tsx` (cmdk, `shouldFilter={false}` with manual static-command filtering so live mail results + "Ask AI" always render). Server action `app/(app)/command/actions.ts` → `searchInbox(query)` (best-effort, cap 6, no redirect). Mounted in `app/(app)/layout.tsx` inside `CommandProvider`. ⌘K/Ctrl+K wired in `KeyboardShortcuts.tsx` (works even while typing) + added to the `?` cheat-sheet. Styles `.cmd-group`/`.cmd-item` in `globals.css`. Groups: Navigate / Actions (context-aware "Reply to this thread") / Mail (debounced 300ms search) / AI (`openWith` hand-off). `pnpm build` clean. **Manual smoke test still owed:** open app → ⌘K → type → search + Ask AI.
+
+
 
 A single overlay to navigate, act, search, and invoke AI. The signature Superhuman interaction; it also makes everything else discoverable in the demo.
 

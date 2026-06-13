@@ -20,7 +20,8 @@ export function Pricing() {
         <Reveal className="section-head">
           <span className="eyebrow">Pricing</span>
           <h2 className="display">
-            Free <em>by nature.</em>
+            Free <em>by nature.</em> <br />
+            Paid <em>for Convenience</em>
           </h2>
           <p className="lede">
             ZenScail is built around a simple idea: the app is free. Bring your

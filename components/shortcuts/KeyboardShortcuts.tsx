@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCommandPalette } from "@/components/command/CommandProvider";
 
 const CHEATSHEET: [string, string][] = [
+  ["⌘K / Ctrl+K", "Command palette"],
   ["c", "Compose"],
   ["r", "Reply (in a thread)"],
   ["j / k", "Next / previous message"],
@@ -49,11 +51,18 @@ function clickRowAction(action: "archive" | "trash") {
 
 export function KeyboardShortcuts() {
   const router = useRouter();
+  const command = useCommandPalette();
   const [showHelp, setShowHelp] = useState(false);
   const pendingG = useRef(false);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      // ⌘K / Ctrl+K opens the command palette — works even while typing.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        command.toggle();
+        return;
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "Escape") {
         setShowHelp(false);
@@ -115,7 +124,7 @@ export function KeyboardShortcuts() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [router]);
+  }, [router, command]);
 
   if (!showHelp) return null;
   return (
