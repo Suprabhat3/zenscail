@@ -1,8 +1,20 @@
 {
+  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/cron/daily-summary",
       "schedule": "30 3 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/chat/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/webhooks/corsair/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/daily-summary/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }
