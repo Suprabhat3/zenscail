@@ -151,6 +151,15 @@ DB (`gmail.db.*`): `drafts.search`, `labels.search`, `messages.search`, `threads
 
 Webhooks: `gmail.webhooks.messageChanged` — fires on message activity changes.
 
+### Webhook delivery (RESOLVED — day 4, implemented)
+
+Findings from live docs (`https://docs.corsair.dev/concepts/webhooks`) + SDK type inspection:
+- **Single endpoint, multi-tenant.** You point Corsair at ONE delivery URL and add a (hashed) tenant id as a query param to identify the tenant. Newer SDKs expose a `processWebhook(corsair, headers, body, { tenantId })` helper that verifies the provider signature using stored `webhook_signature` creds and normalizes the payload.
+- **`processWebhook` is NOT in `@corsair-dev/app@0.1.5`** (latest published; only 0.1.0–0.1.5 exist). There is also no SDK RPC to register a delivery URL — registration is a **Corsair dashboard step** (per instance/tenant). So we can't call the provider-signature verifier from this version.
+- **Our approach (`lib/webhooks.ts` + `app/api/webhooks/corsair/route.ts`):** authenticate inbound deliveries with a per-tenant token in the URL = `HMAC-SHA256("webhook:"+tenantId, APP_SECRET)`, checked constant-time. This is the docs-recommended "hashed tenant id as query param" pattern and proves the URL originated from us (unforgeable without APP_SECRET). Payload plugin/type are parsed defensively (shapes vary). Gmail message events trigger `classifyMessages` inline + publish a realtime event. **Gmail webhook output kinds:** `messageReceived` / `messageDeleted` / `messageLabelChanged`, each `{ emailAddress, historyId, message, labelsAdded?, labelsRemoved? }`.
+- **Upgrade path:** when `processWebhook` ships, swap the token check for it to also verify the provider signature.
+- **Manual step the user owns:** in dev, run `ngrok http 3000`, set `PUBLIC_WEBHOOK_ORIGIN` to the tunnel, run `pnpm webhook:url` to print the per-tenant URL, and register it in the Corsair dashboard.
+
 ## Google Calendar plugin operations (`googlecalendar`)
 
 API (`googlecalendar.api.*`):

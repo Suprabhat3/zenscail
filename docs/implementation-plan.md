@@ -113,9 +113,9 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** the example use case works: "Send a calendar invite to friend@corsair.dev at 9 AM next Thursday. Send him an email too…"
 
-## Phase 6 — Realtime webhooks (bonus) — ⏸️ DEFERRED (2026-06-12, day 3)
+## Phase 6 — Realtime webhooks (bonus) — ✅ DONE (2026-06-13, day 4)
 
-> **Status: deliberately deferred by user decision.** Still blocked on the unknown Corsair webhook registration + signature-verification mechanism (not in `corsair-reference.md`). The design below is unchanged and remains the intended approach. See handoff.md "Phase 6 — deferred (read before picking it up)" for the exact unknowns and the resolution path (fetch live Corsair docs / ask support, then append to corsair-reference.md). Nothing was stubbed — clean start. Phase 7's classifier currently runs on render/refresh; once webhooks land they should also trigger `classifyMessages` for new mail.
+> **Implemented.** Registration mechanism resolved (see corsair-reference.md "Webhook delivery (RESOLVED)"): single dashboard-registered endpoint, per-tenant token in the URL. `app/api/webhooks/corsair/route.ts` receives events, auth'd by an HMAC token (`lib/webhooks.ts`, `APP_SECRET`) since `processWebhook`/provider-signature verification isn't in SDK 0.1.5. New mail triggers `classifyMessages` inline (Phase 7's realtime trigger) + publishes to an in-memory bus (`lib/realtime.ts`). Per-user SSE endpoint `app/api/stream/route.ts`; client `components/realtime/LiveUpdates.tsx` (mounted in `(app)/layout.tsx`) re-fetches the inbox/calendar on relevant events. `InboxEvent` model added + pushed. `pnpm webhook:url` prints the per-tenant URL to register. Smoke-tested live (401 on bad/missing token, 200 + classify + log + publish on valid). **Remaining manual step:** ngrok tunnel + register the URL in the Corsair dashboard (no SDK RPC for it).
 
 
 1. `app/api/webhooks/corsair/route.ts` receives `gmail.webhooks.messageChanged` and `googlecalendar.webhooks.onEventChanged`. Check the Corsair dashboard/docs for the exact registration mechanism and signature verification (this detail isn't in our cached reference — fetch `https://docs.corsair.dev/app/direct-execution.md` neighbors or the dashboard when implementing).

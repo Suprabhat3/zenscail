@@ -3,6 +3,7 @@ import { getChatModelOptions } from "@/lib/ai/registry";
 import { AppNav } from "@/components/app/AppNav";
 import { UserMenu } from "@/components/app/UserMenu";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
+import { LiveUpdates } from "@/components/realtime/LiveUpdates";
 import { ChatProvider } from "@/components/chat/ChatProvider";
 import { ChatDock } from "@/components/chat/ChatDock";
 import { ChatLauncher } from "@/components/chat/ChatLauncher";
@@ -31,6 +32,7 @@ export default async function AppLayout({
         </header>
         <main className="flex-1">{children}</main>
         <KeyboardShortcuts />
+        <LiveUpdates />
         <ChatDock
           tier={chatOptions.tier}
           provider={chatOptions.provider}

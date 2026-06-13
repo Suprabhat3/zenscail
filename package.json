@@ -8,11 +8,13 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "provision:corsair": "tsx --env-file=.env scripts/provision-corsair.mts"
+    "provision:corsair": "tsx --env-file=.env scripts/provision-corsair.mts",
+    "webhook:url": "tsx --env-file=.env scripts/webhook-url.mts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.83",
     "@ai-sdk/google": "^3.0.81",
+    "@ai-sdk/groq": "^3.0.41",
     "@ai-sdk/mcp": "^1.0.48",
     "@ai-sdk/openai": "^3.0.70",
     "@ai-sdk/react": "^3.0.204",

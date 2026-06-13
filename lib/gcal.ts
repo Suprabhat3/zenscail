@@ -19,6 +19,8 @@ export type GcalAttendee = {
   responseStatus?: "needsAction" | "declined" | "tentative" | "accepted";
 };
 
+export type EventReminder = { method: "popup" | "email"; minutes: number };
+
 export type GcalEvent = {
   id?: string;
   status?: "confirmed" | "tentative" | "cancelled";
@@ -31,6 +33,14 @@ export type GcalEvent = {
   attendees?: GcalAttendee[];
   hangoutLink?: string;
   recurringEventId?: string;
+  recurrence?: string[];
+  visibility?: "default" | "public" | "private";
+  transparency?: "opaque" | "transparent";
+  colorId?: string;
+  reminders?: { useDefault?: boolean; overrides?: EventReminder[] };
+  guestsCanModify?: boolean;
+  guestsCanInviteOthers?: boolean;
+  guestsCanSeeOtherGuests?: boolean;
   organizer?: { email?: string; displayName?: string; self?: boolean };
 };
 
@@ -142,12 +152,28 @@ export type EventInput = {
   start: GcalEventTime;
   end: GcalEventTime;
   attendees?: GcalAttendee[];
+  recurrence?: string[];
+  visibility?: "default" | "public" | "private";
+  transparency?: "opaque" | "transparent";
+  colorId?: string;
+  reminders?: { useDefault: boolean; overrides?: EventReminder[] };
+  guestsCanModify?: boolean;
+  guestsCanInviteOthers?: boolean;
+  guestsCanSeeOtherGuests?: boolean;
+  // When set, a Google Meet link is requested for the event.
+  conferenceData?: {
+    createRequest: {
+      requestId: string;
+      conferenceSolutionKey: { type: "hangoutsMeet" };
+    };
+  };
 };
 
 export async function createEvent(t: TenantScope, event: EventInput) {
   return t.run<GcalEvent>("googlecalendar.api.events.create", {
     event,
     sendUpdates: "all", // attendees get real invite emails
+    ...(event.conferenceData ? { conferenceDataVersion: 1 } : {}),
   });
 }
 
@@ -156,6 +182,7 @@ export async function updateEvent(t: TenantScope, id: string, event: EventInput)
     id,
     event,
     sendUpdates: "all",
+    ...(event.conferenceData ? { conferenceDataVersion: 1 } : {}),
   });
 }
 

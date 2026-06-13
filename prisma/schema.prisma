@@ -66,6 +66,18 @@ model DailyBrief {
   @@map("daily_brief")
 }
 
+model InboxEvent {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  plugin    String // "gmail" | "googlecalendar"
+  type      String // event kind from the Corsair webhook payload
+  payload   Json // raw normalized webhook payload, for debugging/replay
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("inbox_event")
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime @map("expires_at")

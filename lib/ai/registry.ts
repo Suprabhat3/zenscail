@@ -3,6 +3,7 @@ import "server-only";
 import { createOpenAI, openai } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGroq } from "@ai-sdk/groq";
 import type { LanguageModel } from "ai";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
@@ -27,6 +28,8 @@ export function modelInstance(
       return createAnthropic({ apiKey })(model);
     case "google":
       return createGoogleGenerativeAI({ apiKey })(model);
+    case "groq":
+      return createGroq({ apiKey })(model);
   }
 }
 

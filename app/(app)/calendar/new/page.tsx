@@ -36,25 +36,36 @@ export default async function NewEventPage({
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
-      <Link href="/calendar" className="text-sm text-neutral-400 hover:text-neutral-200">
+      <Link href="/calendar" className="text-sm text-(--muted) transition hover:text-(--ink)">
         ← Back to calendar
       </Link>
-      <h1 className="mt-3 font-serif text-2xl">New event</h1>
+      <h1 className="mt-3 font-serif text-3xl font-normal tracking-tight text-(--ink)">
+        New event
+      </h1>
+      <p className="mt-0.5 text-sm text-(--muted)">
+        Add it to your Google Calendar and notify your guests.
+      </p>
 
       {date && (
-        <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm">
-          <span className="text-neutral-400">Busy on {date}: </span>
-          {busy.length === 0 ? (
-            <span className="text-neutral-300">all clear</span>
-          ) : (
-            <span className="text-neutral-300">
-              {busy.map((b) => `${formatTime(b.start)}–${formatTime(b.end)}`).join(", ")}
-            </span>
-          )}
+        <div className="mt-5 flex items-start gap-2 rounded-2xl border border-(--line-soft) bg-(--paper) px-4 py-3 text-sm shadow-(--shadow-card)">
+          <svg className="mt-0.5 shrink-0 text-(--accent)" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v6l4 2" />
+          </svg>
+          <span>
+            <span className="text-(--muted)">Busy on {date}: </span>
+            {busy.length === 0 ? (
+              <span className="font-medium text-(--ink)">all clear</span>
+            ) : (
+              <span className="text-(--ink-soft)">
+                {busy.map((b) => `${formatTime(b.start)}–${formatTime(b.end)}`).join(", ")}
+              </span>
+            )}
+          </span>
         </div>
       )}
 
-      <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+      <div className="mt-6 rounded-3xl border border-(--line-soft) bg-(--paper) p-6 shadow-(--shadow-card)">
         <EventForm
           action={createEventAction}
           defaults={{ date, summary, description }}

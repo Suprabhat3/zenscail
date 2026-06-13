@@ -1,4 +1,14 @@
-# Handoff — ZenScail (written 2026-06-12, end of day 1; updated 2026-06-12 day 2; updated 2026-06-12 day 3)
+# Handoff — ZenScail (written 2026-06-12, end of day 1; updated day 2; day 3; day 4)
+
+> **Day-4 update: Phase 6 (realtime webhooks + SSE) is DONE.** The blocker (unknown registration/signature mechanism) is resolved — details in corsair-reference.md "Webhook delivery (RESOLVED)". Summary:
+> - **Registration:** Corsair uses ONE dashboard-registered delivery URL with a (hashed) tenant id as a query param. There is NO SDK RPC to register it (SDK 0.1.5, latest). The newer `processWebhook` signature-verification helper is also not in 0.1.5.
+> - **Receiver:** `app/api/webhooks/corsair/route.ts` — auth'd by a per-tenant HMAC token in the URL (`lib/webhooks.ts`, keyed by `APP_SECRET`; constant-time check). Maps `tenantId`→user, logs an `InboxEvent` row, triggers `classifyMessages` inline for new mail (Phase 7's realtime trigger), publishes a realtime event.
+> - **SSE:** in-memory bus `lib/realtime.ts` (single-process — fine for dev/single-instance; swap for Redis/LISTEN-NOTIFY if multi-instance) → per-user stream `app/api/stream/route.ts` → client `components/realtime/LiveUpdates.tsx` (mounted in `(app)/layout.tsx`) debounced `router.refresh()` + toast.
+> - **Schema:** `InboxEvent` model added + `prisma db push`ed to Neon.
+> - **Tooling:** `pnpm webhook:url` (scripts/webhook-url.mts) prints the per-tenant URL to register. New optional env `PUBLIC_WEBHOOK_ORIGIN` (ngrok tunnel; falls back to BETTER_AUTH_URL).
+> - **Verified:** dev server smoke test — 401 on bad/missing token, 200 + classify + event-log + publish on valid token (hit real Corsair for the connected tenant `demo@gmail.com`).
+> - **Manual step the user owns:** `ngrok http 3000` → set `PUBLIC_WEBHOOK_ORIGIN` → `pnpm webhook:url` → paste the URL into the Corsair dashboard's webhook settings. Then send yourself an email and watch the inbox refresh.
+> - **Note:** the receiver does its list+classify work inline (~12s observed) before returning 200. Fine for the demo; if Corsair retries on slow responses, move classify off the response path (queue/after()).
 
 > **Day-3 update: Phase 7 (AI priority filtering) is code-complete via the backfill-on-refresh path. Phase 6 (webhooks) was deliberately DEFERRED by user decision — see "Phase 6 — deferred (read before picking it up)" below for the full context the next agent needs.**
 >
