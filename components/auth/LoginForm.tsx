@@ -34,33 +34,160 @@ export function LoginForm({
   const rawNext = searchParams.get("next");
   const next = rawNext && rawNext.startsWith("/") ? rawNext : "/dashboard";
 
-  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
+  const [mode, setMode] = useState<"signin" | "signup" | "verify">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  function looksUnverified(message?: string) {
+    return /verif/i.test(message ?? "");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setPending(true);
-    const result =
-      mode === "signin"
-        ? await authClient.signIn.email({ email, password })
-        : await authClient.signUp.email({ name, email, password });
+
+    if (mode === "signup") {
+      const result = await authClient.signUp.email({ name, email, password });
+      setPending(false);
+      if (result.error) {
+        setError(result.error.message ?? "Something went wrong");
+        return;
+      }
+      // requireEmailVerification + sendVerificationOnSignUp: the 6-digit code
+      // is already on its way. Move to the verify step (no session yet).
+      setMode("verify");
+      setNotice(`We sent a 6-digit code to ${email}.`);
+      return;
+    }
+
+    // signin
+    const result = await authClient.signIn.email({ email, password });
     if (result.error) {
       setPending(false);
+      if (looksUnverified(result.error.message)) {
+        // Unverified account — send a fresh code and route to verification.
+        await authClient.emailOtp.sendVerificationOtp({
+          email,
+          type: "email-verification",
+        });
+        setMode("verify");
+        setNotice(`Please verify your email — we sent a code to ${email}.`);
+        return;
+      }
       setError(result.error.message ?? "Something went wrong");
       return;
     }
+    setPending(false);
     router.push(next);
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    setPending(true);
+    const result = await authClient.emailOtp.verifyEmail({ email, otp });
+    if (result.error) {
+      setPending(false);
+      setError(result.error.message ?? "Invalid or expired code");
+      return;
+    }
+    // autoSignInAfterVerification creates the session for us.
+    router.push(next);
+  }
+
+  async function handleResend() {
+    setError(null);
+    await authClient.emailOtp.sendVerificationOtp({
+      email,
+      type: "email-verification",
+    });
+    setNotice(`New code sent to ${email}.`);
   }
 
   async function handleGoogle() {
     setError(null);
     await authClient.signIn.social({ provider: "google", callbackURL: next });
+  }
+
+  if (mode === "verify") {
+    return (
+      <div className="w-full max-w-sm">
+        <h1 className="font-serif text-3xl font-normal text-(--ink)">Verify your email</h1>
+        <p className="mt-2 text-sm text-(--ink-soft)">
+          Enter the 6-digit code we sent to{" "}
+          <span className="font-medium text-(--ink)">{email}</span>.
+        </p>
+
+        {notice && (
+          <p className="mt-4 rounded-xl border border-(--sage)/30 bg-[#EFF4E8] px-4 py-2.5 text-sm text-[#44532F]">
+            {notice}
+          </p>
+        )}
+
+        <form onSubmit={handleVerify} className="mt-6 space-y-4">
+          <label className="block text-sm font-medium text-(--ink)">
+            Verification code
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              maxLength={6}
+              placeholder="000000"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className={`${inputClass} text-center text-lg tracking-[0.5em]`}
+            />
+          </label>
+
+          {error && (
+            <p className="rounded-xl border border-(--accent)/30 bg-(--accent-soft) px-4 py-2.5 text-sm text-(--accent-deep)">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending || otp.length !== 6}
+            className="w-full rounded-full bg-(--accent) px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-(--accent-deep) disabled:opacity-50"
+          >
+            {pending ? "Verifying…" : "Verify & continue"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-(--ink-soft)">
+          Didn&apos;t get it?{" "}
+          <button
+            onClick={handleResend}
+            className="font-semibold text-(--accent) transition hover:text-(--accent-deep)"
+          >
+            Resend code
+          </button>
+        </p>
+        <p className="mt-2 text-center text-sm text-(--muted)">
+          <button
+            onClick={() => {
+              setMode("signin");
+              setError(null);
+              setNotice(null);
+              setOtp("");
+            }}
+            className="transition hover:text-(--ink)"
+          >
+            ← Use a different email
+          </button>
+        </p>
+      </div>
+    );
   }
 
   return (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
+import { syncConnectedEmail } from "@/lib/identity";
 import { createConnectLink } from "./actions";
 
 export const metadata = { title: "Connect accounts — ZenScail" };
@@ -41,6 +42,17 @@ export default async function ConnectPage() {
   const tenantId = await ensureCorsairTenant(session.user.id);
   const statuses = await getConnectionStatus(tenantId);
   const allConnected = statuses.every((s) => s.connected);
+  const gmailConnected = statuses.find((s) => s.id === "gmail")?.connected;
+
+  // Once Gmail is connected, record the real mailbox address so the rest of the
+  // app can present it as the user's identity (it may differ from their login).
+  const connectedEmail = gmailConnected
+    ? await syncConnectedEmail(session.user.id, tenantId)
+    : null;
+  const mismatch = Boolean(
+    connectedEmail &&
+      connectedEmail.toLowerCase() !== session.user.email.toLowerCase(),
+  );
 
   return (
     <div className="mx-auto max-w-lg px-6 py-16">
@@ -79,6 +91,30 @@ export default async function ConnectPage() {
           </li>
         ))}
       </ul>
+
+      {connectedEmail && (
+        <div className="mt-6 rounded-2xl border border-(--line-soft) bg-(--paper) px-5 py-4">
+          <p className="text-sm text-(--ink-soft)">
+            Connected mailbox:{" "}
+            <span className="font-semibold text-(--ink)">{connectedEmail}</span>
+          </p>
+        </div>
+      )}
+
+      {mismatch && (
+        <div className="mt-4 rounded-2xl border border-(--gold)/40 bg-[#FBF3E3] px-5 py-4">
+          <p className="text-sm font-medium text-[#7A5414]">
+            Heads up — you signed in as{" "}
+            <span className="font-semibold">{session.user.email}</span> but
+            connected the{" "}
+            <span className="font-semibold">{connectedEmail}</span> mailbox.
+          </p>
+          <p className="mt-1 text-xs text-[#8A6320]">
+            That&apos;s fine if it&apos;s intentional — ZenScail will manage the{" "}
+            {connectedEmail} inbox. To use a different account, reconnect below.
+          </p>
+        </div>
+      )}
 
       {/* CTA */}
       <form action={createConnectLink} className="mt-8">

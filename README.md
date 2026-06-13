@@ -137,6 +137,10 @@ GOOGLE_CLIENT_SECRET=...
 OPENAI_API_KEY=sk-...                        # cloud tier (optional if every user brings a key)
 APP_SECRET=...                               # 32+ char secret; encrypts BYOK keys (AES-256-GCM)
 
+# Email (Resend) — verification OTP + onboarding emails
+RESEND_API_KEY=re_...                        # optional in dev: unset → emails are logged to console
+EMAIL_FROM="ZenScail <onboarding@resend.dev>" # must be a Resend-verified sender/domain
+
 # Realtime + cron (optional in dev)
 PUBLIC_WEBHOOK_ORIGIN=https://...            # public origin Corsair posts webhooks to (e.g. ngrok / prod)
 CRON_SECRET=...                              # secures /api/cron/daily-summary

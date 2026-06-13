@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   // tenantId == our Corsair tenant id; map it back to the app user.
   const user = await prisma.user.findFirst({
     where: { corsairTenantId: tenantId },
-    select: { id: true },
+    select: { id: true, connectedEmail: true },
   });
   if (!user) return new Response("Unknown tenant", { status: 404 });
 
@@ -63,6 +63,23 @@ export async function POST(req: Request) {
   const event: RealtimeEvent = { plugin, type, at: Date.now() };
   publish(user.id, event);
 
+  // Gmail webhook payloads carry the connected mailbox address — record it as
+  // the user's identity (it may differ from their app-login email). Cheap, no
+  // API call; best-effort so it never blocks the ack.
+  if (plugin === "gmail") {
+    const addr = extractEmailAddress(body);
+    if (addr && user.connectedEmail?.toLowerCase() !== addr) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { connectedEmail: addr },
+        });
+      } catch (err) {
+        console.error("webhook: failed to record connected email", err);
+      }
+    }
+  }
+
   // New mail → run the priority classifier (Phase 7's realtime trigger). This
   // is slow (lists + LLM calls), so do it AFTER the 200 so we ack fast and
   // Corsair never times out / retries. Best-effort; badges appear next render.
@@ -79,6 +96,19 @@ export async function POST(req: Request) {
   }
 
   return Response.json({ ok: true });
+}
+
+/** Pull `emailAddress` out of a Gmail webhook payload (top-level or nested). */
+function extractEmailAddress(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const nested = (b.message ?? b.event ?? b.data) as
+    | Record<string, unknown>
+    | undefined;
+  const raw = b.emailAddress ?? nested?.emailAddress;
+  if (typeof raw !== "string") return null;
+  const addr = raw.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr) ? addr : null;
 }
 
 /** Best-effort plugin/type extraction — payload shapes vary by provider. */

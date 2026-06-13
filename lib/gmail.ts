@@ -170,6 +170,58 @@ export async function listInboxMessages(
   return { ok: true, messages };
 }
 
+/** Extract an email address from a header value like `"Jo" <jo@x.com>`. */
+function parseAddress(value: string): string | null {
+  const angle = value.match(/<([^>]+)>/);
+  const raw = (angle ? angle[1] : value).trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw) ? raw : null;
+}
+
+/**
+ * Best-effort discovery of the connected mailbox's own address. Corsair doesn't
+ * expose gmail.api.users.getProfile, so we sample a few inbox messages and take
+ * the most common `Delivered-To` (falling back to `To`) header — that's the
+ * address mail was delivered to, i.e. the connected mailbox. Returns null if
+ * the tenant isn't connected or we can't determine it.
+ */
+export async function getConnectedAddress(t: TenantScope): Promise<string | null> {
+  const list = await t.run<{ messages?: { id?: string }[] }>(
+    "gmail.api.messages.list",
+    { labelIds: ["INBOX"], maxResults: 8 },
+  );
+  if (!list.success) return null;
+
+  const ids = (list.data?.messages ?? [])
+    .map((m) => m.id)
+    .filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return null;
+
+  const counts = new Map<string, number>();
+  await Promise.all(
+    ids.map(async (id) => {
+      const res = await t.run<GmailMessage>("gmail.api.messages.get", {
+        id,
+        format: "metadata",
+      });
+      if (!res.success) return;
+      const candidate =
+        header(res.data.payload, "Delivered-To") || header(res.data.payload, "To");
+      const addr = parseAddress(candidate);
+      if (addr) counts.set(addr, (counts.get(addr) ?? 0) + 1);
+    }),
+  );
+
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [addr, n] of counts) {
+    if (n > bestN) {
+      best = addr;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
 function toMillis(value: string | number | null | undefined): number {
   if (value == null) return 0;
   const n = typeof value === "number" ? value : Number(value);

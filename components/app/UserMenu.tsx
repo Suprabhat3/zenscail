@@ -8,10 +8,13 @@ import { authClient } from "@/lib/auth-client";
 export function UserMenu({
   name,
   email,
+  loginEmail,
   image,
 }: {
   name: string;
   email: string;
+  /** When set, the app-login email differs from the connected mailbox (`email`). */
+  loginEmail?: string;
   image?: string | null;
 }) {
   const router = useRouter();
@@ -60,6 +63,11 @@ export function UserMenu({
           <div className="border-b border-(--line-soft) px-4 pb-2.5">
             <p className="truncate text-sm font-semibold text-(--ink)">{name}</p>
             <p className="truncate text-xs text-(--muted)">{email}</p>
+            {loginEmail && (
+              <p className="mt-0.5 truncate text-[11px] text-(--muted)">
+                signed in as {loginEmail}
+              </p>
+            )}
           </div>
           <div className="py-1">
             {[

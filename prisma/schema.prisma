@@ -14,6 +14,11 @@ model User {
   emailVerified   Boolean   @default(false)
   image           String?
   corsairTenantId String?   @map("corsair_tenant_id")
+  // The Gmail address actually connected via Corsair — may differ from `email`
+  // (the app-login identity). This is the real mailbox the user is reading.
+  connectedEmail  String?   @map("connected_email")
+  // Set once the welcome/onboarding email has been sent, so it's never duplicated.
+  welcomedAt      DateTime? @map("welcomed_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   sessions        Session[]

@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { getChatModelOptions } from "@/lib/ai/registry";
+import { prisma } from "@/lib/prisma";
+import { resolveIdentity } from "@/lib/identity";
 import { AppNav } from "@/components/app/AppNav";
 import { UserMenu } from "@/components/app/UserMenu";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
@@ -16,6 +19,17 @@ export default async function AppLayout({
   const session = await requireSession();
   const chatOptions = await getChatModelOptions(session.user.id);
 
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { connectedEmail: true },
+  });
+  const identity = resolveIdentity({
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image,
+    connectedEmail: dbUser?.connectedEmail,
+  });
+
   return (
     <ChatProvider>
       <div className="flex min-h-screen flex-col bg-(--bg) text-(--ink)">
@@ -24,12 +38,23 @@ export default async function AppLayout({
           <div className="flex items-center gap-3">
             <ChatLauncher />
             <UserMenu
-              name={session.user.name}
-              email={session.user.email}
-              image={session.user.image}
+              name={identity.displayName}
+              email={identity.primaryEmail}
+              loginEmail={identity.mismatch ? identity.loginEmail : undefined}
+              image={identity.image}
             />
           </div>
         </header>
+        {identity.mismatch && (
+          <div className="border-b border-(--gold)/30 bg-[#FBF3E3] px-6 py-2 text-center text-xs text-[#7A5414]">
+            Managing the{" "}
+            <span className="font-semibold">{identity.connectedEmail}</span>{" "}
+            mailbox — signed in as {identity.loginEmail}.{" "}
+            <Link href="/connect" className="font-semibold underline hover:text-[#5C3F0F]">
+              Switch account
+            </Link>
+          </div>
+        )}
         <main className="flex-1">{children}</main>
         <KeyboardShortcuts />
         <LiveUpdates />
