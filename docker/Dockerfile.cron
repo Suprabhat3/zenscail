@@ -1,21 +1,11 @@
-# Lightweight scheduler container: supercronic + curl.
-# Triggers the app's /api/cron/* endpoints on the schedule in docker/crontab.
+# Lightweight scheduler container: busybox crond + curl.
+# Multi-arch (works on amd64 and arm64) with no binary downloads.
+# Triggers the app's /api/cron/* endpoints on schedule — see cron-entrypoint.sh.
 FROM alpine:3.20
 
-# Pin supercronic for reproducible builds.
-ARG SUPERCRONIC_VERSION=v0.2.33
-ARG SUPERCRONIC_SHA1SUM=71b0d58cc53f6bd72cf2f293e09e294b79c666d8
-ARG SUPERCRONIC=supercronic-linux-amd64
+RUN apk add --no-cache curl ca-certificates
 
-RUN apk add --no-cache curl ca-certificates \
- && curl -fsSLO "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/${SUPERCRONIC}" \
- && echo "${SUPERCRONIC_SHA1SUM}  ${SUPERCRONIC}" | sha1sum -c - \
- && chmod +x "${SUPERCRONIC}" \
- && mv "${SUPERCRONIC}" /usr/local/bin/supercronic
+COPY docker/cron-entrypoint.sh /usr/local/bin/cron-entrypoint.sh
+RUN chmod +x /usr/local/bin/cron-entrypoint.sh
 
-COPY docker/crontab /etc/crontab
-
-USER nobody
-
-# -passthrough-logs sends job stdout/stderr to supercronic's stdout (docker logs).
-CMD ["supercronic", "-passthrough-logs", "/etc/crontab"]
+CMD ["/usr/local/bin/cron-entrypoint.sh"]
