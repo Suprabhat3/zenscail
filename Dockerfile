@@ -2,12 +2,14 @@
 
 # ---- Base ---------------------------------------------------------------
 # Pin to the Node major the project targets (@types/node ^20).
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 # Prisma needs libc compatibility on Alpine.
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 # Enable pnpm via corepack (project uses pnpm — never npm).
-RUN corepack enable
+# Pin the version to match the lockfile (v9.0) and avoid corepack grabbing a
+# newer pnpm that requires a newer Node than this base image.
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
 
 # ---- Dependencies -------------------------------------------------------
 FROM base AS deps
