@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { RecipientField } from "@/components/mail/RecipientField";
 import { SendBar } from "@/components/mail/SendBar";
+import { SmartComposeTextarea } from "@/components/mail/SmartComposeTextarea";
 
 export const metadata = { title: "Compose — ZenScail" };
 
@@ -9,7 +10,12 @@ const fieldLabel = "w-16 shrink-0 pt-2.5 text-sm font-medium text-(--muted)";
 const bareInput =
   "flex-1 bg-transparent py-2 text-sm text-(--ink) placeholder:text-(--muted) focus:outline-none";
 
-export default async function ComposePage() {
+export default async function ComposePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ to?: string; subject?: string; body?: string }>;
+}) {
+  const { to, subject, body } = await searchParams;
   const session = await requireSession();
   const me = session.user.email;
 
@@ -36,7 +42,7 @@ export default async function ComposePage() {
           <div className="flex items-start gap-3 border-b border-(--line-soft) pb-3">
             <label className={fieldLabel}>To</label>
             <div className="flex-1">
-              <RecipientField name="to" required placeholder="Start typing a name or email…" />
+              <RecipientField name="to" required defaultValue={to ?? ""} placeholder="Start typing a name or email…" />
             </div>
           </div>
 
@@ -49,19 +55,23 @@ export default async function ComposePage() {
               id="subject"
               type="text"
               name="subject"
+              defaultValue={subject ?? ""}
               placeholder="Add a subject"
               className={bareInput}
             />
           </div>
         </div>
 
-        {/* Body */}
-        <textarea
+        {/* Body — with smart-compose ghost text (off by default; /settings/mail) */}
+        <SmartComposeTextarea
           name="body"
           rows={13}
           required
+          defaultValue={body ?? ""}
           placeholder="Write your message…"
-          className="w-full resize-none bg-transparent px-5 py-4 text-sm leading-relaxed text-(--ink) placeholder:text-(--muted) focus:outline-none"
+          className="px-5 py-4"
+          subjectId="subject"
+          toName="to"
         />
 
         {/* Footer */}

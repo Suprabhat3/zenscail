@@ -19,7 +19,9 @@ export async function GET() {
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
 
-  const { ok, messages } = await listInboxMessages(t, { limit: 100 });
+  // Keep this modest: each message is hydrated with its own Corsair API call,
+  // so a large limit makes this route slow and prone to upstream timeouts.
+  const { ok, messages } = await listInboxMessages(t, { limit: 40 });
   if (!ok) return Response.json({ contacts: [] });
 
   const seen = new Set<string>();

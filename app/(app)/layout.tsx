@@ -12,6 +12,7 @@ import { ChatDock } from "@/components/chat/ChatDock";
 import { ChatLauncher } from "@/components/chat/ChatLauncher";
 import { CommandProvider } from "@/components/command/CommandProvider";
 import { CommandPalette } from "@/components/command/CommandPalette";
+import { QuickAddBar } from "@/components/command/QuickAddBar";
 import { ToastProvider } from "@/components/ui/Toast";
 import { SnoozeHotkeyBridge } from "@/components/mail/SnoozeHotkeyBridge";
 
@@ -41,6 +42,7 @@ export default async function AppLayout({
       <div className="flex min-h-screen flex-col bg-(--bg) text-(--ink)">
         <header className="sticky top-0 z-40 flex items-center justify-between border-b border-(--line-soft) bg-(--bg)/85 px-6 py-3 backdrop-blur">
           <AppNav />
+          <QuickAddBar />
           <div className="flex items-center gap-3">
             <ChatLauncher />
             <UserMenu

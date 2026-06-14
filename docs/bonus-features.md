@@ -143,7 +143,25 @@ Superhuman's signature feature: "remind me if no reply." Pairs naturally with th
 
 ---
 
-## Feature 6 — Natural-language quick-add bar 🥉
+## Feature 6 — Natural-language quick-add bar 🥉 — ✅ SHIPPED
+
+> **Done.** Server action `app/(app)/quick-add/actions.ts` → `quickAdd(text)`: one **cheap-tier** `generateObject` call (zod object with a `kind` enum `event|email|search|agent` + per-kind fields + a one-line `confirm`) parses the line; system prompt injects current date/time + user email/name and resolves relative dates to absolute ISO. Robust post-processing normalizes/validates (event needs a summary + parseable start, defaults end to +1h; bad/ambiguous → falls back to `agent`). Second action `createQuickEvent()` confirms-and-creates via `createEvent` (returns a result, never redirects). UI `components/command/QuickAddBar.tsx` mounted in the app **header** (`app/(app)/layout.tsx`, hidden < md): Enter parses → **event** shows an inline confirmation popover (Create / Edit details → `/calendar/new` prefilled / Cancel) before any write; **email** → `/mail/compose?to=&subject=&body=` (compose page now reads those searchParams; `RecipientField`/subject prefilled); **search** → `/mail?q=`; **agent** → `openWith()` chat hand-off. Command palette gained a "Booking links" action too. `tsc` clean. **Manual smoke test owed:** type "lunch with Sam tomorrow 1pm" → confirm card → Create; "email dana@x.com the deck is ready" → composer prefilled; "find invoices" → search; vague text → chat dock.
+
+---
+
+## Feature 7 — Scheduling links (Calendly-style) 🥉 — ✅ SHIPPED
+
+> **Done.** Schema: `BookingLink { slug @unique, userId, title, durationMins, windowDays, hoursStart, hoursEnd, timezone, active }` — `prisma db push`ed to Neon + client regenerated (**restart dev server** to clear the stale Turbopack-bundled client). Core `lib/booking.ts`: `mintSlug()` (crypto `randomBytes`, no nanoid dep), timezone-correct slot math (`tzOffsetMs`/`wallClockToInstant` via `Intl` so working-hours are interpreted in the owner's tz), `computeOpenSlots(link, now)` (walks the window in duration steps, drops past + busy-overlapping slots using `getAvailability`, groups by local day, caps per day), `slotIsFree()` (re-check before booking), `getBookingLink()`. Manage UI `/calendar/links`: `BookingLinkForm` (client — captures browser tz via `Intl`, posts `createBookingLink`) + `BookingLinkList` (copy link, preview, turn on/off, delete). Public, **unauthenticated** page `app/book/[slug]/page.tsx` (outside `(app)`, `force-dynamic`) → `SlotPicker` client component (day columns of time chips → name/email → Confirm → success card). Booking action `app/book/[slug]/actions.ts` → `book(slug, slotIso, name, email)`: validates email, looks up the link, **re-checks the slot is still free** (double-book guard), `createEvent` on the owner's tenant with the booker as attendee (`sendUpdates:"all"` via `createEvent`), then `publish()` so the owner's open calendar refreshes. Entry point added to the calendar page header + command palette. `tsc` clean. **Design note:** availability windows are integer hours in the owner's stored timezone; DST seams use the offset at the slot instant (good enough for the demo). **Manual smoke test owed:** create a link → copy → open `/book/<slug>` in a second window → pick a slot → book → event appears on the calendar with the guest invited.
+
+---
+
+## Feature 8 — Smart compose autocomplete 🧪 — ✅ SHIPPED
+
+> **Done.** Endpoint `app/api/compose-complete/route.ts` (POST `{subject,to,body}` → `{completion}`): **cheap-tier** `generateText`, low temp, system prompt forces a short (≤~12 word) continuation only; guards (skip < 2 / > 4000 chars, strip quotes, cap 80 chars); best-effort returns `""` on any failure. UI `components/mail/SmartComposeTextarea.tsx` (client) renders **ghost text** via an underlay div mirroring the textarea (transparent text + gray completion) under a transparent-background textarea sharing identical typography/padding; debounced 550ms with `AbortController` cancel-on-keystroke, only fires when the caret is at the end. **Tab** accepts, **Esc**/typing/blur dismisses; a small "Tab to complete" hint shows while a ghost is present. Wired into the compose page body (`name="body"`, keeps `required`, prefilled from quick-add). **Off by default** — `SmartComposeSetting` toggle in `/settings/mail` (localStorage `zenscail:smartCompose`, mirrors `UndoWindowSetting`) so it never interferes with the live demo unless turned on. `tsc` clean. **Manual smoke test owed:** `/settings/mail` → turn on Smart compose → `/mail/compose` → type a sentence → gray suggestion appears → Tab accepts / Esc dismisses.
+
+---
+
+## Feature 6 (original spec) — Natural-language quick-add bar 🥉
 
 Agent power without opening the full chat — a single bar that parses and executes one-shot commands.
 

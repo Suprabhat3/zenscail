@@ -109,6 +109,7 @@ export function CommandPalette() {
       { id: "act-compose", label: "Compose new email", keywords: "write send mail new", group: "Actions", icon: <IconBolt />, perform: () => router.push("/mail/compose") },
       { id: "act-refresh", label: "Refresh inbox", keywords: "sync gmail reload", group: "Actions", icon: <IconBolt />, perform: () => void refreshInbox().catch(() => {}) },
       { id: "act-event", label: "New calendar event", keywords: "meeting schedule create", group: "Actions", icon: <IconBolt />, perform: () => router.push("/calendar/new") },
+      { id: "act-links", label: "Booking links", keywords: "calendly schedule availability share book", group: "Actions", icon: <IconBolt />, perform: () => router.push("/calendar/links") },
       { id: "act-urgent", label: "Show urgent mail first", keywords: "priority important filter", group: "Actions", icon: <IconBolt />, perform: () => router.push("/mail?view=urgent") },
     ];
     if (onThread) {

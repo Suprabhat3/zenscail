@@ -39,16 +39,34 @@ export function RecipientField({
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Lazy-load the contact list once, the first time the field is focused.
+  // Lazy-load the contact list. The contacts endpoint hits Corsair and can be
+  // slow or time out, so we only latch "loaded" on a SUCCESSFUL non-empty
+  // response — a failure or empty result leaves it unlatched so the next focus
+  // (or a keystroke) retries instead of being stuck with no suggestions.
   const loadedRef = useRef(false);
+  const loadingRef = useRef(false);
   function loadContacts() {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
+    if (loadedRef.current || loadingRef.current) return;
+    loadingRef.current = true;
     fetch("/api/contacts")
       .then((r) => (r.ok ? r.json() : { contacts: [] }))
-      .then((d) => setContacts(d.contacts ?? []))
-      .catch(() => setContacts([]));
+      .then((d) => {
+        const list: Contact[] = Array.isArray(d.contacts) ? d.contacts : [];
+        setContacts(list);
+        if (list.length > 0) loadedRef.current = true;
+      })
+      .catch(() => setContacts([]))
+      .finally(() => {
+        loadingRef.current = false;
+      });
   }
+
+  // Warm the contact list on mount so suggestions are ready before the first
+  // focus (and so a slow/failed first attempt has already had a chance).
+  useEffect(() => {
+    loadContacts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -166,6 +184,7 @@ export function RecipientField({
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
+            loadContacts();
           }}
           onKeyDown={onKeyDown}
           onBlur={() => query.trim() && addRecipient(query)}

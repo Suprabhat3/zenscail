@@ -136,6 +136,26 @@ model FollowUp {
   @@map("follow_up")
 }
 
+model BookingLink {
+  id           Int      @id @default(autoincrement())
+  // Public, unguessable slug used in the shareable /book/<slug> URL.
+  slug         String   @unique
+  userId       String   @map("user_id")
+  title        String
+  durationMins Int      @map("duration_mins")
+  // How far into the future bookers may pick a slot.
+  windowDays   Int      @map("window_days")
+  // Daily availability window, in `timezone`, as 24h integer hours (e.g. 9–17).
+  hoursStart   Int      @map("hours_start")
+  hoursEnd     Int      @map("hours_end")
+  timezone     String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("booking_link")
+}
+
 model InboxEvent {
   id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
