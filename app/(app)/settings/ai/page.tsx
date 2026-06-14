@@ -46,7 +46,7 @@ export default async function AiSettingsPage({
         </div>
       )}
 
-      <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+      <div className="mt-6 p-5">
         <AiSettingsForm
           action={saveAiSettings}
           initial={{

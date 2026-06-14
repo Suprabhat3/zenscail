@@ -13,7 +13,8 @@ import {
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
 import { ThreadAiActions } from "@/components/mail/ThreadAiActions";
 import { EmailFrame } from "@/components/mail/EmailFrame";
-import { sendMessage } from "../../actions";
+import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
+import { SendBar } from "@/components/mail/SendBar";
 
 export const metadata = { title: "Thread — ZenScail" };
 
@@ -171,6 +172,7 @@ export default async function ThreadPage({
       {/* Actions bar */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <ThreadAiActions subject={subject} from={parseSender(lastFrom).name} />
+        <SnoozeMenu threadId={thread.id ?? id} />
         <Link
           href={`/calendar/new?summary=${encodeURIComponent(subject)}&description=${encodeURIComponent(`From email thread with ${lastFrom}`)}`}
           className="flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-1.5 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
@@ -191,10 +193,7 @@ export default async function ThreadPage({
       </div>
 
       {/* Reply form */}
-      <form
-        action={sendMessage}
-        className="mt-8 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) p-5 shadow-(--shadow-card)"
-      >
+      <form className="mt-8 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) p-5 shadow-(--shadow-card)">
         <h2 className="flex items-center gap-2 text-[11.5px] font-bold tracking-widest text-(--accent) uppercase">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M9 17H4v-5l9.5-9.5a3.54 3.54 0 0 1 5 5L9 17ZM21 21H8" />
@@ -222,13 +221,8 @@ export default async function ThreadPage({
           className="mt-3 w-full resize-y rounded-xl border border-(--line) bg-(--bg) px-4 py-3 text-sm leading-relaxed text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
         />
         <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-(--muted)">Sends from your connected Gmail account.</p>
-          <button className="flex items-center gap-1.5 rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)">
-            Send reply
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m22 2-7 20-4-9-9-4ZM22 2 11 13" />
-            </svg>
-          </button>
+          <p className="text-xs text-(--muted)">Sends from your connected Gmail · Undo for a few seconds.</p>
+          <SendBar successHref={`/mail/thread/${thread.id ?? id}`} label="Send reply" />
         </div>
       </form>
     </div>

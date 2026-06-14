@@ -71,6 +71,45 @@ model DailyBrief {
   @@map("daily_brief")
 }
 
+model SnoozedThread {
+  id          Int      @id @default(autoincrement())
+  userId      String   @map("user_id")
+  threadId    String   @map("thread_id")
+  // Captured so the wake cron can re-surface the right conversation; the
+  // thread id is what we re-label INBOX on.
+  snoozeUntil DateTime @map("snooze_until")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // One active snooze per thread per user; re-snoozing upserts.
+  @@unique([userId, threadId])
+  @@index([userId, snoozeUntil])
+  @@map("snoozed_thread")
+}
+
+model ScheduledSend {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  to        String
+  cc        String?
+  subject   String
+  body      String
+  threadId  String?  @map("thread_id")
+  inReplyTo String?  @map("in_reply_to")
+  sendAt    DateTime @map("send_at")
+  // "pending" | "sent" | "failed" | "canceled"
+  status    String   @default("pending")
+  // Set when the send fails, for the outbox UI.
+  error     String?
+  // Distinguishes the short undo-window deferral from a real "send later".
+  isUndo    Boolean  @default(false) @map("is_undo")
+  createdAt DateTime @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+
+  @@index([userId, status, sendAt])
+  @@index([status, sendAt])
+  @@map("scheduled_send")
+}
+
 model InboxEvent {
   id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")

@@ -56,7 +56,11 @@ A single overlay to navigate, act, search, and invoke AI. The signature Superhum
 
 ---
 
-## Feature 2 — Snooze · Send Later · Undo Send 🥇
+## Feature 2 — Snooze · Send Later · Undo Send 🥇 — ✅ SHIPPED
+
+> **Done.** Schema: `SnoozedThread` (`@@unique([userId, threadId])`) + `ScheduledSend` (`pending|sending|sent|failed|canceled`, `isUndo` flag) — `prisma db push`ed to Neon + client regenerated. Libs: `lib/scheduledSend.ts` (`deliverScheduledSend` claims a row atomically via `updateMany status:pending→sending` so cron + client-flush never double-send; `processDueSends`), `lib/snooze.ts` (`wakeDueSnoozes`), `lib/timePresets.ts` (client-safe tz-aware presets), `lib/gmail.ts` `modifyThread`. Server actions in `app/(app)/mail/schedule-actions.ts`: `snoozeThread`/`unsnoozeThread`, `deferSend` (undo-window), `scheduleSend` (send-later), `cancelScheduledSend`, `flushScheduledSend`, `catchUpSchedules` (opportunistic wake+flush on inbox render — makes it work despite coarse cron). Crons `snooze-wake` + `scheduled-send` (*/5, CRON_SECRET) added to `vercel.json`. Toast system `components/ui/Toast.tsx` (action + `onExpire` for the undo commit, countdown bar) mounted in layout. UI: `SnoozeMenu` (thread bar + inbox-row icon), `SendBar` (Send w/ undo + Send-later caret, replaces plain buttons in compose & reply), `UnsnoozeButton`, `CancelSendButton`; inbox **Snoozed** + **Scheduled** tabs; keyboard `h` → `SnoozeHotkeyBridge` (snoozes focused thread to "Tomorrow"); undo-window setting (`/settings/mail`, localStorage). **Undo design (chosen):** Send is a deferred `ScheduledSend` row; we stay on the page during the window so Undo trivially preserves the draft; client flushes on expiry, cron is the closed-tab backstop. `pnpm build` + `tsc` clean. **Manual smoke test owed:** snooze a thread → Snoozed tab; schedule a send → Scheduled tab + cancel; send w/ undo → click Undo.
+
+
 
 The productivity trio. All three are achievable with Gmail labels + a scheduler cron; no new Corsair ops beyond `messages.modify` / `messages.send` we already use.
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { RecipientField } from "@/components/mail/RecipientField";
-import { sendMessage } from "../actions";
+import { SendBar } from "@/components/mail/SendBar";
 
 export const metadata = { title: "Compose — ZenScail" };
 
@@ -30,10 +30,7 @@ export default async function ComposePage() {
         </div>
       </div>
 
-      <form
-        action={sendMessage}
-        className="mt-6 overflow-hidden rounded-3xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)"
-      >
+      <form className="mt-6 overflow-hidden rounded-3xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
         <div className="px-5 pt-4">
           {/* To — autocompleting recipient field */}
           <div className="flex items-start gap-3 border-b border-(--line-soft) pb-3">
@@ -70,13 +67,7 @@ export default async function ComposePage() {
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-(--line-soft) bg-(--bg)/40 px-5 py-3.5">
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="m22 2-7 20-4-9-9-4Z" />
-                <path d="M22 2 11 13" />
-              </svg>
-              Send
-            </button>
+            <SendBar successHref="/mail" />
             <Link
               href="/mail"
               className="rounded-full px-3 py-2.5 text-sm font-medium text-(--muted) transition hover:text-(--ink)"
@@ -85,7 +76,7 @@ export default async function ComposePage() {
             </Link>
           </div>
           <p className="hidden text-xs text-(--muted) sm:block">
-            Recipients get your message straight from Gmail.
+            Sends from your connected Gmail · Undo for a few seconds after sending.
           </p>
         </div>
       </form>

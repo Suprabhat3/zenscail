@@ -12,6 +12,8 @@ import { ChatDock } from "@/components/chat/ChatDock";
 import { ChatLauncher } from "@/components/chat/ChatLauncher";
 import { CommandProvider } from "@/components/command/CommandProvider";
 import { CommandPalette } from "@/components/command/CommandPalette";
+import { ToastProvider } from "@/components/ui/Toast";
+import { SnoozeHotkeyBridge } from "@/components/mail/SnoozeHotkeyBridge";
 
 export default async function AppLayout({
   children,
@@ -35,6 +37,7 @@ export default async function AppLayout({
   return (
     <ChatProvider>
       <CommandProvider>
+      <ToastProvider>
       <div className="flex min-h-screen flex-col bg-(--bg) text-(--ink)">
         <header className="sticky top-0 z-40 flex items-center justify-between border-b border-(--line-soft) bg-(--bg)/85 px-6 py-3 backdrop-blur">
           <AppNav />
@@ -60,6 +63,7 @@ export default async function AppLayout({
         )}
         <main className="flex-1">{children}</main>
         <KeyboardShortcuts />
+        <SnoozeHotkeyBridge />
         <CommandPalette />
         <LiveUpdates />
         <ChatDock
@@ -69,6 +73,7 @@ export default async function AppLayout({
           models={chatOptions.models}
         />
       </div>
+      </ToastProvider>
       </CommandProvider>
     </ChatProvider>
   );

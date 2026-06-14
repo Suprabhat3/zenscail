@@ -1522,4 +1522,9 @@ section[data-screen-label] { position: relative; }
   background: var(--accent-soft);
 }
 
+@keyframes toast-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
 } /* end @layer components (landing styles) */

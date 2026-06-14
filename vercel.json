@@ -4,6 +4,14 @@
     {
       "path": "/api/cron/daily-summary",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/snooze-wake",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/scheduled-send",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
@@ -15,6 +23,12 @@
     },
     "app/api/cron/daily-summary/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/cron/snooze-wake/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/scheduled-send/route.ts": {
+      "maxDuration": 120
     }
   }
 }

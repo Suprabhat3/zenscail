@@ -259,6 +259,15 @@ export async function markThreadRead(t: TenantScope, id: string) {
   return t.run("gmail.api.threads.modify", { id, removeLabelIds: ["UNREAD"] });
 }
 
+/** Add/remove labels across every message in a thread (used by snooze/wake). */
+export async function modifyThread(
+  t: TenantScope,
+  id: string,
+  changes: { addLabelIds?: string[]; removeLabelIds?: string[] },
+) {
+  return t.run("gmail.api.threads.modify", { id, ...changes });
+}
+
 export async function modifyMessage(
   t: TenantScope,
   id: string,

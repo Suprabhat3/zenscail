@@ -178,7 +178,7 @@ export default function PrivacyPage() {
         <p>
           You can disconnect Google at any time from the app, or revoke ZenScail&rsquo;s
           access from your Google Account&rsquo;s security settings. To exercise any
-          right, email <Mail address="support@zenscail.com" /> and we&rsquo;ll respond
+          right, email <Mail address="support@zenscail.com" /> <br />and we&rsquo;ll respond
           within the time required by applicable law.
         </p>
       </section>
@@ -198,7 +198,7 @@ export default function PrivacyPage() {
         <p>
           ZenScail is not directed to children under 16, and we do not knowingly collect
           their personal information. If you believe a child has provided us data, contact{" "}
-          <Mail address="support@zenscail.com" /> and we will delete it.
+          <Mail address="support@zenscail.com" /> <br /> and we will delete it.
         </p>
       </section>
 

@@ -12,6 +12,7 @@ const CHEATSHEET: [string, string][] = [
   ["Enter", "Open focused message"],
   ["e", "Archive focused message"],
   ["#", "Trash focused message"],
+  ["h", "Snooze focused thread"],
   ["u", "Back to inbox"],
   ["/", "Focus search"],
   ["g then i", "Go to inbox"],
@@ -42,7 +43,7 @@ function moveFocus(delta: 1 | -1) {
   next.scrollIntoView({ block: "nearest" });
 }
 
-function clickRowAction(action: "archive" | "trash") {
+function clickRowAction(action: "archive" | "trash" | "snooze") {
   const row = (document.activeElement as HTMLElement | null)?.closest("li");
   row
     ?.querySelector<HTMLButtonElement>(`button[data-row-action="${action}"]`)
@@ -117,6 +118,18 @@ export function KeyboardShortcuts() {
         case "#":
           clickRowAction("trash");
           break;
+        case "h": {
+          const link = (document.activeElement as HTMLElement | null)?.closest("li")
+            ?.querySelector<HTMLElement>("a[data-thread-id]");
+          const threadId = link?.dataset.threadId;
+          if (threadId) {
+            e.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent("zenscail:snooze", { detail: { threadId } }),
+            );
+          }
+          break;
+        }
         case "?":
           setShowHelp((s) => !s);
           break;
