@@ -3,6 +3,10 @@
 # environment — so $CRON_SECRET below is expanded from the service env.
 # Jobs hit the app over the internal compose network (service name `app`).
 #
+# supercronic defaults SHELL to /bin/bash, which isn't in the Alpine image —
+# pin it to the busybox shell so jobs can exec.
+SHELL=/bin/sh
+
 # min hour dom mon dow   command
 
 # Daily brief for every Corsair-connected user — 03:30 UTC

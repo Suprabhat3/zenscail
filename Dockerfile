@@ -43,16 +43,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
-# Standalone output bundles the server + traced node_modules.
+# Standalone output bundles the server + the generated Prisma client (traced
+# automatically). Schema sync (`prisma db push`) is handled by the one-shot
+# `migrate` service in docker-compose, which uses the full builder image —
+# the standalone image deliberately omits the Prisma CLI.
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-# Prisma artifacts needed at runtime: the generated client (traced into
-# standalone automatically) plus the schema for `prisma db push` on startup.
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 USER nextjs
 EXPOSE 3000

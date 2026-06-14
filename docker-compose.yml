@@ -20,6 +20,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # One-shot schema sync. Uses the `builder` stage (full source + working
+  # Prisma CLI) to run `prisma db push`, then exits. The app waits for this to
+  # complete successfully before booting. (No migration files; `db push` is the
+  # project's flow.) prisma.config.ts reads DATABASE_URL from the env below.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zenscail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-zenscail}?sslmode=disable
+    command: ["pnpm", "exec", "prisma", "db", "push", "--skip-generate"]
+
   app:
     build:
       context: .
@@ -28,6 +45,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       # App reaches Postgres by its service name on the compose network.
       DATABASE_URL: postgresql://${POSTGRES_USER:-zenscail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-zenscail}?sslmode=disable
@@ -49,11 +68,8 @@ services:
     # Bound to localhost so only the host's nginx reverse proxy can reach it.
     ports:
       - "127.0.0.1:3003:3000"
-    # Sync the Prisma schema to the DB on startup, then boot the standalone
-    # server. (There are no migration files; `db push` is the project's flow.)
-    command: >
-      sh -c "node_modules/.bin/prisma db push --skip-generate
-      --schema prisma/schema.prisma --url \"$$DATABASE_URL\" && node server.js"
+    # Standalone server. Schema sync already ran in the `migrate` service.
+    command: ["node", "server.js"]
 
   # Replaces Vercel Cron: triggers the app's /api/cron/* endpoints on a
   # schedule (see docker/crontab). Talks to `app` over the internal network.
