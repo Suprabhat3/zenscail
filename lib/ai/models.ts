@@ -42,7 +42,7 @@ export const MODELS: Record<AiProvider, { id: string; label: string; cheap?: boo
 
 /** Cloud (default) tier — uses our own OPENAI_API_KEY. */
 export const CLOUD_MODEL = "gpt-5.4";
-export const CLOUD_CHEAP_MODEL = "gpt-5.4-nano";
+export const CLOUD_CHEAP_MODEL = "gpt-5-nano";
 
 export function isValidModel(provider: AiProvider, model: string): boolean {
   return MODELS[provider]?.some((m) => m.id === model) ?? false;

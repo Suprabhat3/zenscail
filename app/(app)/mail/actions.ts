@@ -72,3 +72,22 @@ export async function markReadAction(formData: FormData) {
   await modifyMessage(t, id, { removeLabelIds: ["UNREAD"] });
   revalidatePath("/mail");
 }
+
+/** Batch action over a bundle: mark every message read or archive them all. */
+export async function bundleAction(ids: string[], op: "read" | "archive") {
+  const clean = ids.filter(Boolean);
+  if (clean.length === 0) return { ok: true };
+  const t = await tenantForCurrentUser();
+  const mods =
+    op === "archive"
+      ? { removeLabelIds: ["INBOX"] }
+      : { removeLabelIds: ["UNREAD"] };
+  const results = await Promise.allSettled(
+    clean.map((id) => modifyMessage(t, id, mods)),
+  );
+  const failed = results.some(
+    (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.success),
+  );
+  revalidatePath("/mail");
+  return { ok: !failed };
+}

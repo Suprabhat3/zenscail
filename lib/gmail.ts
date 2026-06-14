@@ -44,6 +44,10 @@ export type InboxMessage = {
   snippet: string;
   internalDate: number;
   unread: boolean;
+  /** Gmail system/category labels (e.g. CATEGORY_PROMOTIONS) — drives bundling. */
+  labelIds: string[];
+  /** True when the message carries a List-Unsubscribe header (bulk/newsletter). */
+  hasListUnsubscribe: boolean;
 };
 
 // --- Helpers ---
@@ -134,6 +138,8 @@ async function hydrate(t: TenantScope, refs: MessageRef[]): Promise<InboxMessage
         snippet: m.snippet ?? "",
         internalDate: toMillis(m.internalDate),
         unread: (m.labelIds ?? []).includes("UNREAD"),
+        labelIds: m.labelIds ?? [],
+        hasListUnsubscribe: Boolean(header(m.payload, "List-Unsubscribe")),
       } satisfies InboxMessage;
     }),
   );

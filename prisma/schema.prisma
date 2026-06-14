@@ -48,6 +48,7 @@ model EmailMeta {
   gmailMessageId  String   @map("gmail_message_id")
   priority        String // "urgent" | "normal" | "low"
   reason          String?
+  category        String? // "important" | "newsletter" | "social" | "notification" | "other"
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@unique([userId, gmailMessageId])

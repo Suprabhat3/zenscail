@@ -1,20 +1,41 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import type { InboxMessage } from "@/lib/gmail";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
 import { listInboxMessages, getThread, header } from "@/lib/gmail";
-import { classifyMessages, getPriorities, type Priority } from "@/lib/ai/classify";
+import {
+  classifyMessages,
+  getPriorities,
+  displayCategory,
+  type Priority,
+  type Category,
+} from "@/lib/ai/classify";
 import { PriorityBadge } from "@/components/mail/PriorityBadge";
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
 import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
 import { UnsnoozeButton } from "@/components/mail/UnsnoozeButton";
 import { CancelSendButton } from "@/components/mail/CancelSendButton";
+import { BundleSection } from "@/components/mail/BundleSection";
+import { LayoutToggle } from "@/components/mail/LayoutToggle";
 import { refreshInbox, trashMessageAction, archiveMessageAction } from "./actions";
 import { catchUpSchedules } from "./schedule-actions";
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, low: 2 };
+
+type RowMeta = { priority: Priority; reason?: string | null; category?: string | null };
+
+const BUNDLE_ORDER: Category[] = ["important", "newsletter", "social", "notification", "other"];
+const BUNDLE_META: Record<Category, { emoji: string; title: string }> = {
+  important: { emoji: "📌", title: "Important" },
+  newsletter: { emoji: "📰", title: "Newsletters" },
+  social: { emoji: "👥", title: "Social" },
+  notification: { emoji: "🔔", title: "Notifications" },
+  other: { emoji: "📥", title: "Everything else" },
+};
 
 export const metadata = { title: "Mail — ZenScail" };
 
@@ -55,6 +76,13 @@ export default async function MailPage({
   const userId = session.user.id;
   const tenantId = await ensureCorsairTenant(userId);
   const t = corsairTenant(tenantId);
+
+  // Bundled vs flat layout preference (cookie, toggled client-side).
+  const layout: "bundled" | "flat" =
+    (await cookies()).get("mail_layout")?.value === "flat" ? "flat" : "bundled";
+  // Bundling only applies to the default "All" view; the other tabs stay flat.
+  const isDefaultView = !urgentFirst && !unreadView && !snoozedView && !scheduledView;
+  const bundled = isDefaultView && layout === "bundled";
 
   // Opportunistic catch-up: wake due snoozes + flush overdue sends when the
   // inbox opens, so the app works even where cron cadence is coarse.
@@ -111,7 +139,7 @@ export default async function MailPage({
 
   // --- Inbox / search view ---
   let messages: Awaited<ReturnType<typeof listInboxMessages>>["messages"] = [];
-  let priorities = new Map<string, { priority: Priority; reason?: string | null }>();
+  let priorities = new Map<string, RowMeta>();
   if (!snoozedView && !scheduledView) {
     const result = await listInboxMessages(t, { query: q, limit: 25 });
     if (!result.ok) redirect("/connect");
@@ -133,6 +161,33 @@ export default async function MailPage({
   }
 
   const unreadCount = messages.filter((m) => m.unread).length;
+
+  // Group messages into bundles by category (stored, else heuristic).
+  type Bundle = { category: Category; messages: InboxMessage[] };
+  let bundles: Bundle[] = [];
+  if (bundled) {
+    const byCat = new Map<Category, InboxMessage[]>();
+    for (const m of messages) {
+      const cat = displayCategory(m, priorities.get(m.id ?? "")?.category);
+      const list = byCat.get(cat) ?? [];
+      list.push(m);
+      byCat.set(cat, list);
+    }
+    // Within a bundle, surface urgent → unread → recency.
+    for (const list of byCat.values()) {
+      list.sort((a, b) => {
+        const pa = PRIORITY_RANK[priorities.get(a.id ?? "")?.priority ?? "normal"];
+        const pb = PRIORITY_RANK[priorities.get(b.id ?? "")?.priority ?? "normal"];
+        if (pa !== pb) return pa - pb;
+        if (a.unread !== b.unread) return a.unread ? -1 : 1;
+        return b.internalDate - a.internalDate;
+      });
+    }
+    bundles = BUNDLE_ORDER.filter((c) => byCat.has(c)).map((c) => ({
+      category: c,
+      messages: byCat.get(c)!,
+    }));
+  }
 
   const subtitle = snoozedView
     ? `${snoozed.length} snoozed thread${snoozed.length === 1 ? "" : "s"}`
@@ -221,6 +276,11 @@ export default async function MailPage({
             </Link>
           </span>
         )}
+        {isDefaultView && (
+          <div className="ml-auto pb-2">
+            <LayoutToggle layout={layout} />
+          </div>
+        )}
       </div>
 
       {/* Body */}
@@ -228,123 +288,149 @@ export default async function MailPage({
         <SnoozedList snoozed={snoozed} formatWhen={formatWhen} />
       ) : scheduledView ? (
         <ScheduledList scheduled={scheduled} formatWhen={formatWhen} />
+      ) : messages.length === 0 ? (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) px-4 py-20 text-center shadow-(--shadow-card)">
+          <svg className="mx-auto text-(--line)" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+          </svg>
+          <p className="mt-3 font-serif text-lg text-(--ink)">
+            {q && !unreadView
+              ? "No messages match your search"
+              : unreadView
+                ? "You're all caught up"
+                : "Nothing here yet"}
+          </p>
+          <p className="mt-1 text-sm text-(--muted)">
+            {q ? "Try a different search." : "Hit Refresh to sync your inbox."}
+          </p>
+        </div>
+      ) : bundled ? (
+        <>
+          <div className="mt-4 space-y-3">
+            {bundles.map((b) => {
+              const meta = BUNDLE_META[b.category];
+              return (
+                <BundleSection
+                  key={b.category}
+                  category={b.category}
+                  emoji={meta.emoji}
+                  title={meta.title}
+                  ids={b.messages.map((m) => m.id).filter((id): id is string => Boolean(id))}
+                  unread={b.messages.filter((m) => m.unread).length}
+                  defaultOpen={b.category === "important" || b.category === "other"}
+                >
+                  {b.messages.map((m) => (
+                    <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} />
+                  ))}
+                </BundleSection>
+              );
+            })}
+          </div>
+          <InboxTip />
+        </>
       ) : (
         <>
           <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
-            {messages.length === 0 && (
-              <div className="px-4 py-20 text-center">
-                <svg className="mx-auto text-(--line)" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="2" y="4" width="20" height="16" rx="2" />
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                </svg>
-                <p className="mt-3 font-serif text-lg text-(--ink)">
-                  {q && !unreadView
-                    ? "No messages match your search"
-                    : unreadView
-                      ? "You're all caught up"
-                      : "Nothing here yet"}
-                </p>
-                <p className="mt-1 text-sm text-(--muted)">
-                  {q ? "Try a different search." : "Hit Refresh to sync your inbox."}
-                </p>
-              </div>
-            )}
             <ul className="divide-y divide-(--line-soft)">
-              {messages.map((m) => {
-                const p = m.id ? priorities.get(m.id) : undefined;
-                const sender = parseSender(m.from || "");
-                return (
-                  <li
-                    key={m.id}
-                    className={`group relative flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-(--bg) sm:px-5 ${
-                      m.unread ? "bg-(--paper)" : "bg-(--bg)/40"
-                    }`}
-                  >
-                    <SenderAvatar from={m.from || "?"} />
-                    <Link
-                      href={`/mail/thread/${m.threadId}`}
-                      data-thread-link
-                      data-thread-id={m.threadId}
-                      className="min-w-0 flex-1 focus:outline-none"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-2">
-                          {m.unread && (
-                            <span
-                              className="h-2 w-2 shrink-0 rounded-full bg-(--accent)"
-                              title="Unread"
-                            />
-                          )}
-                          <span
-                            className={`truncate text-sm ${
-                              m.unread ? "font-bold text-(--ink)" : "font-medium text-(--ink-soft)"
-                            }`}
-                          >
-                            {sender.name || "(unknown sender)"}
-                          </span>
-                          {p && p.priority !== "normal" && (
-                            <PriorityBadge priority={p.priority} reason={p.reason} />
-                          )}
-                        </span>
-                        <span className="shrink-0 text-xs text-(--muted)">
-                          {formatDate(m.internalDate)}
-                        </span>
-                      </div>
-                      <p
-                        className={`mt-0.5 truncate text-sm ${
-                          m.unread ? "font-semibold text-(--ink)" : "text-(--ink-soft)"
-                        }`}
-                      >
-                        {m.subject || "(no subject)"}
-                      </p>
-                      <p className="truncate text-xs text-(--muted)">{m.snippet}</p>
-                    </Link>
-
-                    {/* Hover actions */}
-                    <div className="absolute top-1/2 right-4 hidden -translate-y-1/2 items-center gap-1 rounded-full border border-(--line-soft) bg-(--paper) p-1 shadow-(--shadow-card) group-hover:flex">
-                      <SnoozeMenu threadId={m.threadId} variant="icon" />
-                      <form action={archiveMessageAction}>
-                        <input type="hidden" name="id" value={m.id} />
-                        <button
-                          data-row-action="archive"
-                          title="Archive"
-                          aria-label="Archive"
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <rect x="2" y="3" width="20" height="5" rx="1" />
-                            <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" />
-                          </svg>
-                        </button>
-                      </form>
-                      <form action={trashMessageAction}>
-                        <input type="hidden" name="id" value={m.id} />
-                        <button
-                          data-row-action="trash"
-                          title="Trash"
-                          aria-label="Trash"
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-(--accent) transition hover:bg-(--accent-soft)"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
-                      </form>
-                    </div>
-                  </li>
-                );
-              })}
+              {messages.map((m) => (
+                <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} />
+              ))}
             </ul>
           </div>
-          <p className="mt-3 text-center text-xs text-(--muted)">
-            Tip: press <kbd className="rounded border border-(--line) bg-(--paper) px-1">j</kbd>/
-            <kbd className="rounded border border-(--line) bg-(--paper) px-1">k</kbd> to move,{" "}
-            <kbd className="rounded border border-(--line) bg-(--paper) px-1">h</kbd> to snooze,{" "}
-            <kbd className="rounded border border-(--line) bg-(--paper) px-1">c</kbd> to compose
-          </p>
+          <InboxTip />
         </>
       )}
     </div>
+  );
+}
+
+function InboxTip() {
+  return (
+    <p className="mt-3 text-center text-xs text-(--muted)">
+      Tip: press <kbd className="rounded border border-(--line) bg-(--paper) px-1">j</kbd>/
+      <kbd className="rounded border border-(--line) bg-(--paper) px-1">k</kbd> to move,{" "}
+      <kbd className="rounded border border-(--line) bg-(--paper) px-1">h</kbd> to snooze,{" "}
+      <kbd className="rounded border border-(--line) bg-(--paper) px-1">c</kbd> to compose
+    </p>
+  );
+}
+
+function MessageRow({ m, p }: { m: InboxMessage; p?: RowMeta }) {
+  const sender = parseSender(m.from || "");
+  return (
+    <li
+      className={`group relative flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-(--bg) sm:px-5 ${
+        m.unread ? "bg-(--paper)" : "bg-(--bg)/40"
+      }`}
+    >
+      <SenderAvatar from={m.from || "?"} />
+      <Link
+        href={`/mail/thread/${m.threadId}`}
+        data-thread-link
+        data-thread-id={m.threadId}
+        className="min-w-0 flex-1 focus:outline-none"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2">
+            {m.unread && (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-(--accent)" title="Unread" />
+            )}
+            <span
+              className={`truncate text-sm ${
+                m.unread ? "font-bold text-(--ink)" : "font-medium text-(--ink-soft)"
+              }`}
+            >
+              {sender.name || "(unknown sender)"}
+            </span>
+            {p && p.priority !== "normal" && (
+              <PriorityBadge priority={p.priority} reason={p.reason} />
+            )}
+          </span>
+          <span className="shrink-0 text-xs text-(--muted)">{formatDate(m.internalDate)}</span>
+        </div>
+        <p
+          className={`mt-0.5 truncate text-sm ${
+            m.unread ? "font-semibold text-(--ink)" : "text-(--ink-soft)"
+          }`}
+        >
+          {m.subject || "(no subject)"}
+        </p>
+        <p className="truncate text-xs text-(--muted)">{m.snippet}</p>
+      </Link>
+
+      {/* Hover actions */}
+      <div className="absolute top-1/2 right-4 hidden -translate-y-1/2 items-center gap-1 rounded-full border border-(--line-soft) bg-(--paper) p-1 shadow-(--shadow-card) group-hover:flex">
+        <SnoozeMenu threadId={m.threadId} variant="icon" />
+        <form action={archiveMessageAction}>
+          <input type="hidden" name="id" value={m.id} />
+          <button
+            data-row-action="archive"
+            title="Archive"
+            aria-label="Archive"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="2" y="3" width="20" height="5" rx="1" />
+              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" />
+            </svg>
+          </button>
+        </form>
+        <form action={trashMessageAction}>
+          <input type="hidden" name="id" value={m.id} />
+          <button
+            data-row-action="trash"
+            title="Trash"
+            aria-label="Trash"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-(--accent) transition hover:bg-(--accent-soft)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </li>
   );
 }
 
