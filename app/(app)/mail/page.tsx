@@ -6,7 +6,8 @@ import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
-import { listInboxMessages, getThread, header } from "@/lib/gmail";
+import { listInboxMessages, getThread, header, getLabelData } from "@/lib/gmail";
+import { MailSidebar } from "@/components/mail/MailSidebar";
 import {
   classifyMessages,
   getPriorities,
@@ -64,26 +65,54 @@ function formatWhen(d: Date): string {
 
 const UNREAD_QUERY = "is:unread";
 
+// Gmail folders (label-backed views) selectable from the sidebar.
+type FolderConfig = {
+  title: string;
+  labelIds?: string[];
+  includeSpamTrash?: boolean;
+};
+const FOLDERS: Record<string, FolderConfig> = {
+  inbox: { title: "Inbox", labelIds: ["INBOX"] },
+  starred: { title: "Starred", labelIds: ["STARRED"] },
+  important: { title: "Important", labelIds: ["IMPORTANT"] },
+  sent: { title: "Sent", labelIds: ["SENT"] },
+  drafts: { title: "Drafts", labelIds: ["DRAFT"] },
+  spam: { title: "Spam", labelIds: ["SPAM"], includeSpamTrash: true },
+  trash: { title: "Trash", labelIds: ["TRASH"], includeSpamTrash: true },
+  all: { title: "All Mail", labelIds: [] }, // empty = no label filter = all mail
+};
+
 export default async function MailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; view?: string; folder?: string; label?: string }>;
 }) {
-  const { q, view } = await searchParams;
+  const { q, view, folder: folderParam, label: labelId } = await searchParams;
   const urgentFirst = view === "urgent";
   const unreadView = q === UNREAD_QUERY;
   const snoozedView = view === "snoozed";
   const scheduledView = view === "scheduled";
+  // Which Gmail folder is selected (defaults to inbox unless searching).
+  const folderKey = folderParam && FOLDERS[folderParam] ? folderParam : "inbox";
+  const folder = FOLDERS[folderKey];
+  const isInbox = folderKey === "inbox" && !labelId && !q;
   const session = await requireSession();
   const userId = session.user.id;
   const tenantId = await ensureCorsairTenant(userId);
   const t = corsairTenant(tenantId);
 
+  // Sidebar data (custom labels + unread counts) — one labels.list call.
+  const labelData = await getLabelData(t).catch(() => ({ custom: [], unread: {} }));
+  const activeLabel = labelId
+    ? labelData.custom.find((l) => l.id === labelId)
+    : undefined;
+
   // Bundled vs flat layout preference (cookie, toggled client-side).
   const layout: "bundled" | "flat" =
     (await cookies()).get("mail_layout")?.value === "flat" ? "flat" : "bundled";
-  // Bundling only applies to the default "All" view; the other tabs stay flat.
-  const isDefaultView = !urgentFirst && !unreadView && !snoozedView && !scheduledView;
+  // Bundling only applies to the default inbox view; folders/tabs stay flat.
+  const isDefaultView =
+    isInbox && !urgentFirst && !unreadView && !snoozedView && !scheduledView;
   const bundled = isDefaultView && layout === "bundled";
 
   // Opportunistic catch-up: wake due snoozes + flush overdue sends when the
@@ -99,13 +128,26 @@ export default async function MailPage({
     ? await listSurfacedFollowUps(userId).catch(() => [])
     : [];
 
+  // "Inbox context" = the default inbox and its sub-views (Urgent/Unread).
+  // Folders, labels, snoozed and scheduled each get their own flat list.
+  const inboxContext = !folderParam && !labelId && !snoozedView && !scheduledView;
   const tabs = [
-    { href: "/mail", label: "All", active: !urgentFirst && !unreadView && !snoozedView && !scheduledView },
+    { href: "/mail", label: "All", active: !urgentFirst && !unreadView },
     { href: "/mail?view=urgent", label: "Urgent first", active: urgentFirst },
     { href: `/mail?q=${UNREAD_QUERY}`, label: "Unread", active: unreadView },
-    { href: "/mail?view=snoozed", label: "Snoozed", active: snoozedView },
-    { href: "/mail?view=scheduled", label: "Scheduled", active: scheduledView },
   ];
+
+  const pageTitle = snoozedView
+    ? "Snoozed"
+    : scheduledView
+      ? "Scheduled"
+      : activeLabel
+        ? activeLabel.name
+        : unreadView
+          ? "Inbox"
+          : q
+            ? "Search"
+            : folder.title;
 
   // --- Snoozed view ---
   let snoozed: { threadId: string; subject: string; snippet: string; until: Date }[] = [];
@@ -152,7 +194,12 @@ export default async function MailPage({
   let messages: Awaited<ReturnType<typeof listInboxMessages>>["messages"] = [];
   let priorities = new Map<string, RowMeta>();
   if (!snoozedView && !scheduledView) {
-    const result = await listInboxMessages(t, { query: q, limit: 25 });
+    const listOpts = q
+      ? { query: q, limit: 25 }
+      : labelId
+        ? { labelIds: [labelId], limit: 25 }
+        : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: 25 };
+    const result = await listInboxMessages(t, listOpts);
     if (!result.ok) redirect("/connect");
     messages = result.messages;
 
@@ -209,11 +256,13 @@ export default async function MailPage({
         }`;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto flex max-w-6xl gap-6 px-6 py-8">
+      <MailSidebar custom={labelData.custom} unread={labelData.unread} />
+      <div className="min-w-0 flex-1">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl text-(--ink)">Inbox</h1>
+          <h1 className="font-serif text-3xl text-(--ink)">{pageTitle}</h1>
           <p className="mt-0.5 text-sm text-(--muted)">{subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -265,20 +314,21 @@ export default async function MailPage({
 
       {/* Filter tabs */}
       <div className="mt-5 flex items-center gap-1 border-b border-(--line-soft)">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.label}
-            href={tab.href}
-            className={`relative px-3.5 pb-2.5 text-sm font-semibold transition ${
-              tab.active ? "text-(--ink)" : "text-(--muted) hover:text-(--ink-soft)"
-            }`}
-          >
-            {tab.label}
-            {tab.active && (
-              <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-(--accent)" />
-            )}
-          </Link>
-        ))}
+        {inboxContext &&
+          tabs.map((tab) => (
+            <Link
+              key={tab.label}
+              href={tab.href}
+              className={`relative px-3.5 pb-2.5 text-sm font-semibold transition ${
+                tab.active ? "text-(--ink)" : "text-(--muted) hover:text-(--ink-soft)"
+              }`}
+            >
+              {tab.label}
+              {tab.active && (
+                <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-(--accent)" />
+              )}
+            </Link>
+          ))}
         {q && !unreadView && (
           <span className="ml-auto pb-2.5 text-sm text-(--muted)">
             Results for &ldquo;{q}&rdquo; —{" "}
@@ -363,6 +413,7 @@ export default async function MailPage({
           <InboxTip />
         </>
       )}
+      </div>
     </div>
   );
 }

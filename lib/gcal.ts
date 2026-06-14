@@ -131,6 +131,34 @@ export async function listEvents(
   return { ok: true, messages: rows };
 }
 
+export type CalendarSummary = {
+  id: string;
+  summary: string;
+  timeZone?: string;
+};
+
+/**
+ * Best-effort list of the user's calendars for the sidebar, read from the
+ * `googlecalendar.db.calendars.search` cache. Like the other caches this may be
+ * sparsely populated, so entries without a usable summary are dropped. Returns
+ * `[]` (never throws) when unconnected/empty — the sidebar falls back to a
+ * single "Primary" entry in that case.
+ */
+export async function listCalendars(t: TenantScope): Promise<CalendarSummary[]> {
+  const res = await t.run<
+    | { id?: string; summary?: string; timeZone?: string }[]
+    | { results?: { id?: string; summary?: string; timeZone?: string }[] }
+  >("googlecalendar.db.calendars.search", { limit: 50 });
+  if (!res.success) return [];
+  const rows = normalizeRows<{ id?: string; summary?: string; timeZone?: string }>(res.data);
+  return rows
+    .filter((c): c is { id: string; summary: string; timeZone?: string } =>
+      Boolean(c.id && c.summary),
+    )
+    .map((c) => ({ id: c.id, summary: c.summary, timeZone: c.timeZone }))
+    .sort((a, b) => a.summary.localeCompare(b.summary));
+}
+
 /** Pull fresh events from the Google Calendar API into Corsair's cache. */
 export async function refreshEvents(
   t: TenantScope,

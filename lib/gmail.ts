@@ -152,14 +152,25 @@ async function hydrate(t: TenantScope, refs: MessageRef[]): Promise<InboxMessage
  */
 export async function listInboxMessages(
   t: TenantScope,
-  opts: { query?: string; limit?: number } = {},
+  opts: {
+    query?: string;
+    limit?: number;
+    /** Gmail label ids to filter by (e.g. ["SENT"], ["DRAFT"], a custom label id). */
+    labelIds?: string[];
+    /** Needed for TRASH/SPAM folders — Gmail excludes them unless this is set. */
+    includeSpamTrash?: boolean;
+  } = {},
 ): Promise<{ ok: boolean; messages: InboxMessage[] }> {
-  const { query, limit = 25 } = opts;
+  const { query, limit = 25, labelIds, includeSpamTrash } = opts;
   // The db cache has no searchable content columns, so we list message refs via
-  // the API: Gmail `q` for search, INBOX label for the default view.
-  const input = query
-    ? { q: query, maxResults: limit }
-    : { labelIds: ["INBOX"], maxResults: limit };
+  // the API: Gmail `q` for search, or a label filter for folder views.
+  const input: Record<string, unknown> = { maxResults: limit };
+  if (query) input.q = query;
+  // labelIds: a non-empty array filters by those labels; an empty array means
+  // "all mail" (no filter); undefined with no query defaults to the inbox.
+  if (labelIds && labelIds.length > 0) input.labelIds = labelIds;
+  else if (labelIds === undefined && !query) input.labelIds = ["INBOX"];
+  if (includeSpamTrash) input.includeSpamTrash = true;
   const res = await t.run<{ messages?: { id?: string; threadId?: string }[] }>(
     "gmail.api.messages.list",
     input,
@@ -174,6 +185,45 @@ export async function listInboxMessages(
     (a, b) => b.internalDate - a.internalDate,
   );
   return { ok: true, messages };
+}
+
+/** A user-created Gmail label (system labels are filtered out). */
+export type GmailLabel = {
+  id: string;
+  name: string;
+  unread: number;
+};
+
+/**
+ * One `labels.list` call powering the whole mail sidebar: the user's own labels
+ * (type === "user", sorted by name) plus a map of every label id → unread count
+ * (so system folders like INBOX/SPAM can show badges). Returns empty data (never
+ * throws) when the tenant isn't connected or the call fails.
+ */
+export async function getLabelData(
+  t: TenantScope,
+): Promise<{ custom: GmailLabel[]; unread: Record<string, number> }> {
+  const res = await t.run<{
+    labels?: {
+      id?: string;
+      name?: string;
+      type?: string;
+      messagesUnread?: number;
+    }[];
+  }>("gmail.api.labels.list", {});
+  if (!res.success) return { custom: [], unread: {} };
+  const labels = res.data?.labels ?? [];
+  const unread: Record<string, number> = {};
+  for (const l of labels) {
+    if (l.id) unread[l.id] = l.messagesUnread ?? 0;
+  }
+  const custom = labels
+    .filter((l): l is { id: string; name: string; type?: string; messagesUnread?: number } =>
+      Boolean(l.id && l.name && l.type === "user"),
+    )
+    .map((l) => ({ id: l.id, name: l.name, unread: l.messagesUnread ?? 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { custom, unread };
 }
 
 /** Extract an email address from a header value like `"Jo" <jo@x.com>`. */
