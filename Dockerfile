@@ -14,8 +14,11 @@ RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
 # ---- Dependencies -------------------------------------------------------
 FROM base AS deps
 COPY package.json pnpm-lock.yaml* ./
+# --ignore-scripts: the `postinstall` hook runs `prisma generate`, which needs
+# the schema (not present in this stage). The builder stage regenerates it via
+# `pnpm build` once the full source is copied.
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ---- Builder ------------------------------------------------------------
 FROM base AS builder
