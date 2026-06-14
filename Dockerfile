@@ -28,6 +28,11 @@ COPY . .
 # A DATABASE_URL is only needed at runtime, not for the build, but Prisma's
 # datasource block requires the env to exist — a dummy value is fine here.
 ENV NEXT_TELEMETRY_DISABLED=1
+# prisma.config.ts resolves env("DATABASE_URL") eagerly, and `prisma generate`
+# loads that config — so the var must exist at build time. No DB connection is
+# made during generate/build, so a syntactically-valid dummy URL is sufficient.
+# The real DATABASE_URL is injected at runtime by docker-compose.
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 RUN pnpm build
 
 # ---- Runner -------------------------------------------------------------
