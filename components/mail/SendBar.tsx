@@ -147,12 +147,15 @@ export function SendBar({
   }
 
   return (
-    <div ref={wrapRef} className="relative flex items-center">
+    <div
+      ref={wrapRef}
+      className="relative inline-flex items-stretch overflow-hidden rounded-full bg-(--ink) text-(--bg) transition has-[button:hover]:bg-(--accent)"
+    >
       <button
         type="button"
         onClick={onSend}
         disabled={busy}
-        className="flex items-center gap-1.5 rounded-l-full bg-(--ink) py-2.5 pr-3.5 pl-5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent) disabled:opacity-60"
+        className="flex items-center gap-1.5 py-2.5 pr-3 pl-5 text-sm font-semibold transition disabled:opacity-60"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="m22 2-7 20-4-9-9-4Z" />
@@ -166,7 +169,7 @@ export function SendBar({
         disabled={busy}
         aria-label="Send later"
         title="Send later"
-        className="flex items-center rounded-r-full border-l border-(--bg)/25 bg-(--ink) py-2.5 pr-3.5 pl-2.5 text-(--bg) transition hover:bg-(--accent) disabled:opacity-60"
+        className="flex items-center border-l border-(--bg)/20 py-2.5 pr-3.5 pl-2.5 transition disabled:opacity-60"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="m6 9 6 6 6-6" />

@@ -15,6 +15,7 @@ import { ThreadAiActions } from "@/components/mail/ThreadAiActions";
 import { EmailFrame } from "@/components/mail/EmailFrame";
 import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
 import { SendBar } from "@/components/mail/SendBar";
+import { ReplyChips } from "@/components/mail/ReplyChips";
 
 export const metadata = { title: "Thread — ZenScail" };
 
@@ -192,8 +193,11 @@ export default async function ThreadPage({
         ))}
       </div>
 
+      {/* Instant AI reply chips */}
+      <ReplyChips threadId={thread.id ?? id} />
+
       {/* Reply form */}
-      <form className="mt-8 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) p-5 shadow-(--shadow-card)">
+      <form className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) p-5 shadow-(--shadow-card)">
         <h2 className="flex items-center gap-2 text-[11.5px] font-bold tracking-widest text-(--accent) uppercase">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M9 17H4v-5l9.5-9.5a3.54 3.54 0 0 1 5 5L9 17ZM21 21H8" />
@@ -214,6 +218,7 @@ export default async function ThreadPage({
           />
         </label>
         <textarea
+          id="reply-body"
           name="body"
           rows={6}
           required

@@ -108,7 +108,9 @@ Turn the flat inbox into triaged sections using the **existing** AI classifier �
 
 ---
 
-## Feature 4 — Instant AI reply chips 🥈
+## Feature 4 — Instant AI reply chips 🥈 — ✅ SHIPPED
+
+> **Done.** Server action `app/(app)/mail/thread/[id]/suggest.ts` → `suggestReplies(threadId)`: loads the thread (`getThread`), feeds the latest message's sender/subject/body excerpt (text body, capped 2500 chars) to the **cheap model tier** (`getModelForUser().cheapModel`) via `generateObject` (zod `{ suggestions: { label ≤40, draft ≤900 }[] }`, max 3). System prompt forces 3 *distinct-intent* options (accept / propose alternative / clarify / decline), first-person, no greeting/signature, no invented facts. Best-effort: returns `[]` on missing model or any error (wrapped in try/catch) so the thread never breaks. UI `components/mail/ReplyChips.tsx` (client): renders **lazily** — a "Suggest replies" button triggers the fetch (thread open stays instant), then shows 3 numbered chips; clicking (or pressing `1`/`2`/`3` when not typing) pre-fills `#reply-body` via `fillReply()` (sets value + dispatches `input` + focuses + scrolls) — **never auto-sends**, fully editable. Reuses the existing reply `<form>`/`SendBar`. Wired into `thread/[id]/page.tsx` above the reply form; textarea given `id="reply-body"`. Cheat-sheet updated with `1/2/3`. `tsc` clean. **Manual smoke test owed:** open a thread → "Suggest replies" → 3 chips → click one → reply box fills & focuses → edit → send.
 
 One-tap, context-aware reply suggestions at the bottom of a thread — AI directly in the triage flow.
 

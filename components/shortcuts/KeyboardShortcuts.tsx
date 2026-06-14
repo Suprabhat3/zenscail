@@ -8,6 +8,7 @@ const CHEATSHEET: [string, string][] = [
   ["⌘K / Ctrl+K", "Command palette"],
   ["c", "Compose"],
   ["r", "Reply (in a thread)"],
+  ["1 / 2 / 3", "Use a quick reply (in a thread)"],
   ["j / k", "Next / previous message"],
   ["Enter", "Open focused message"],
   ["e", "Archive focused message"],
