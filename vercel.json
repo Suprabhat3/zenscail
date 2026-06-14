@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/scheduled-send",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/follow-ups",
+      "schedule": "0 * * * *"
     }
   ],
   "functions": {
@@ -28,6 +32,9 @@
       "maxDuration": 60
     },
     "app/api/cron/scheduled-send/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/follow-ups/route.ts": {
       "maxDuration": 120
     }
   }

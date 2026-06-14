@@ -16,6 +16,8 @@ import { EmailFrame } from "@/components/mail/EmailFrame";
 import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
 import { SendBar } from "@/components/mail/SendBar";
 import { ReplyChips } from "@/components/mail/ReplyChips";
+import { FollowUpButton } from "@/components/mail/FollowUpButton";
+import { getFollowUp } from "@/lib/followUp";
 
 export const metadata = { title: "Thread — ZenScail" };
 
@@ -109,6 +111,7 @@ export default async function ThreadPage({
   const result = await getThread(t, id);
   if (!result.success) redirect("/connect");
   const thread = result.data;
+  const followUp = await getFollowUp(session.user.id, thread.id ?? id).catch(() => null);
   const messages = thread.messages ?? [];
 
   // Opening a thread marks it read, so it leaves the unread view and the bold
@@ -174,6 +177,14 @@ export default async function ThreadPage({
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <ThreadAiActions subject={subject} from={parseSender(lastFrom).name} />
         <SnoozeMenu threadId={thread.id ?? id} />
+        <FollowUpButton
+          threadId={thread.id ?? id}
+          active={
+            followUp
+              ? { status: followUp.status, remindAt: followUp.remindAt.toISOString() }
+              : null
+          }
+        />
         <Link
           href={`/calendar/new?summary=${encodeURIComponent(subject)}&description=${encodeURIComponent(`From email thread with ${lastFrom}`)}`}
           className="flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-1.5 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"

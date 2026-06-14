@@ -21,8 +21,10 @@ import { UnsnoozeButton } from "@/components/mail/UnsnoozeButton";
 import { CancelSendButton } from "@/components/mail/CancelSendButton";
 import { BundleSection } from "@/components/mail/BundleSection";
 import { LayoutToggle } from "@/components/mail/LayoutToggle";
+import { FollowUpBanner } from "@/components/mail/FollowUpBanner";
 import { refreshInbox, trashMessageAction, archiveMessageAction } from "./actions";
 import { catchUpSchedules } from "./schedule-actions";
+import { processDueFollowUps, listSurfacedFollowUps } from "@/lib/followUp";
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, low: 2 };
 
@@ -87,6 +89,15 @@ export default async function MailPage({
   // Opportunistic catch-up: wake due snoozes + flush overdue sends when the
   // inbox opens, so the app works even where cron cadence is coarse.
   await catchUpSchedules().catch(() => {});
+
+  // Follow-up reminders: opportunistically resolve/surface this user's due
+  // follow-ups on inbox render (the hourly cron is the backstop), then load
+  // the ones that need attention for the banner. Only on inbox-style views.
+  const showFollowUps = !snoozedView && !scheduledView;
+  if (showFollowUps) await processDueFollowUps({ userId }).catch(() => {});
+  const surfacedFollowUps = showFollowUps
+    ? await listSurfacedFollowUps(userId).catch(() => [])
+    : [];
 
   const tabs = [
     { href: "/mail", label: "All", active: !urgentFirst && !unreadView && !snoozedView && !scheduledView },
@@ -282,6 +293,17 @@ export default async function MailPage({
           </div>
         )}
       </div>
+
+      {/* Threads waiting on a reply */}
+      {showFollowUps && surfacedFollowUps.length > 0 && (
+        <FollowUpBanner
+          items={surfacedFollowUps.map((f) => ({
+            threadId: f.threadId,
+            subject: f.subject,
+            contact: f.contact,
+          }))}
+        />
+      )}
 
       {/* Body */}
       {snoozedView ? (

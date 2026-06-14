@@ -7,6 +7,7 @@ import { corsairTenant } from "@/lib/corsair";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { listInboxMessages, type InboxMessage } from "@/lib/gmail";
 import { listEvents, isAllDay, type CachedEvent } from "@/lib/gcal";
+import { listSurfacedFollowUps } from "@/lib/followUp";
 import { getModelForUser } from "./registry";
 
 // --- Shapes stored in DailyBrief's Json columns ---
@@ -172,7 +173,19 @@ export async function generateDailyBrief(userId: string): Promise<Brief> {
     ].join("\n"),
   });
 
-  const actionItems: BriefActionItem[] = object.actionItems.map((a) => {
+  // Threads waiting on a reply are surfaced as high-urgency action items,
+  // deterministically (no extra tokens, always included) and ahead of the
+  // LLM's items so they lead the brief.
+  const followUps = await listSurfacedFollowUps(userId).catch(() => []);
+  const followUpItems: BriefActionItem[] = followUps.map((f) => ({
+    title: `Follow up: ${f.subject ?? "(no subject)"}`,
+    detail: `No reply${f.contact ? ` from ${f.contact}` : ""} yet — send a nudge?`,
+    urgency: "high" as const,
+    threadId: f.threadId,
+    subject: f.subject ?? undefined,
+  }));
+
+  const llmActionItems: BriefActionItem[] = object.actionItems.map((a) => {
     const src =
       a.emailIndex != null && a.emailIndex >= 0 && a.emailIndex < emails.length
         ? emails[a.emailIndex]
@@ -187,6 +200,8 @@ export async function generateDailyBrief(userId: string): Promise<Brief> {
       subject: src?.subject,
     };
   });
+
+  const actionItems: BriefActionItem[] = [...followUpItems, ...llmActionItems];
 
   const stats: BriefStats = {
     emailsReviewed: emails.length,

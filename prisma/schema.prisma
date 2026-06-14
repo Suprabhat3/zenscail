@@ -111,6 +111,31 @@ model ScheduledSend {
   @@map("scheduled_send")
 }
 
+model FollowUp {
+  id     Int    @id @default(autoincrement())
+  userId String @map("user_id")
+  // The thread we're waiting on a reply in. One active follow-up per thread.
+  threadId String @map("thread_id")
+  // Gmail message id of the latest message at the time the reminder was set;
+  // the cron compares against it to decide whether a newer inbound reply landed.
+  lastKnownMessageId String @map("last_known_message_id")
+  // Snapshotted for display in the banner/brief without re-fetching the thread.
+  subject String?
+  contact String? // the other party we're waiting on (display name/email)
+  remindAt DateTime @map("remind_at")
+  // "waiting" (armed) | "replied" (got a reply, cleared) | "done" (dismissed)
+  status String @default("waiting")
+  note   String?
+  // Set the first time the cron surfaces an overdue, still-unanswered follow-up,
+  // so we publish the realtime nudge exactly once.
+  surfacedAt DateTime? @map("surfaced_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, threadId])
+  @@index([userId, status, remindAt])
+  @@map("follow_up")
+}
+
 model InboxEvent {
   id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
