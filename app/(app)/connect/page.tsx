@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { syncConnectedEmail } from "@/lib/identity";
-import { createConnectLink } from "./actions";
+import { ConnectButton } from "@/components/connect/ConnectButton";
 
 export const metadata = { title: "Connect accounts — ZenScail" };
 
@@ -117,17 +117,7 @@ export default async function ConnectPage() {
       )}
 
       {/* CTA */}
-      <form action={createConnectLink} className="mt-8">
-        <button
-          type="submit"
-          className="w-full rounded-full bg-(--ink) px-4 py-3 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)"
-        >
-          {allConnected ? "Reconnect accounts" : "Connect with Corsair"}
-        </button>
-      </form>
-      <p className="mt-3 text-center text-xs text-(--muted)">
-        You&apos;ll be redirected to a secure Corsair page to authorize access.
-      </p>
+      <ConnectButton allConnected={allConnected} />
 
       {allConnected && (
         <div className="mt-8 rounded-2xl border border-[#CBD8BC] bg-[#EFF4E8] px-5 py-4">

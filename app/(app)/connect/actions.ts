@@ -1,11 +1,11 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 
-export async function createConnectLink() {
+/** Create a Corsair OAuth link for the client to open in a new tab. */
+export async function createConnectLink(): Promise<{ url: string }> {
   const session = await requireSession();
   const tenantId = await ensureCorsairTenant(session.user.id);
 
@@ -14,5 +14,5 @@ export async function createConnectLink() {
     ttlMs: 30 * 60 * 1000,
   });
 
-  redirect(link.url);
+  return { url: link.url };
 }
