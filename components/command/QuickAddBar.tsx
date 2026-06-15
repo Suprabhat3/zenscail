@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChatDock } from "@/components/chat/ChatProvider";
 import { useToast } from "@/components/ui/Toast";
+import { MicButton } from "@/components/voice/MicButton";
 import {
   quickAdd,
   createQuickEvent,
@@ -131,8 +132,8 @@ export function QuickAddBar() {
 
   return (
     <div className="relative hidden min-w-0 flex-1 justify-center px-4 md:flex">
-      <form onSubmit={submit} className="w-full max-w-md">
-        <div className="relative">
+      <form onSubmit={submit} className="flex w-full max-w-md items-center gap-2">
+        <div className="relative flex-1">
           <svg
             className={`pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 ${busy ? "animate-pulse text-(--accent-deep)" : "text-(--muted)"}`}
             width="15"
@@ -188,6 +189,16 @@ export function QuickAddBar() {
             </div>
           )}
         </div>
+        <MicButton
+          size="sm"
+          disabled={busy}
+          title="Speak a command"
+          onText={(t) => {
+            setText((p) => (p ? `${p.trimEnd()} ` : "") + t);
+            inputRef.current?.focus();
+          }}
+          onError={toast}
+        />
       </form>
 
       {pending && (

@@ -56,6 +56,52 @@ model EmailMeta {
   @@map("email_meta")
 }
 
+model EmailSummary {
+  id             Int      @id @default(autoincrement())
+  userId         String   @map("user_id")
+  gmailMessageId String   @map("gmail_message_id")
+  // One-glance summary, generated ONCE (chief model) on arrival and cached here
+  // so hovering an inbox row never re-summarizes the same email.
+  tldr           String
+  bullets        Json // string[] — key points
+  // The single concrete thing the recipient needs to do, or null if none.
+  action         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, gmailMessageId])
+  @@map("email_summary")
+}
+
+model Conversation {
+  // Client-generated UUID so the dock can persist before the first round-trip.
+  id        String        @id
+  userId    String        @map("user_id")
+  // Derived from the first user message; shown in the history list.
+  title     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  messages  ChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("conversation")
+}
+
+model ChatMessage {
+  // The UIMessage id from the chat client.
+  id             String       @id
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  // Full UIMessage parts (text + tool calls) so a conversation restores exactly.
+  parts          Json
+  // Thumbs up/down on assistant replies: "up" | "down" | null.
+  feedback       String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("chat_message")
+}
+
 model DailyBrief {
   id          Int      @id @default(autoincrement())
   userId      String   @map("user_id")

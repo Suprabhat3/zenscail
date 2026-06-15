@@ -295,6 +295,11 @@ export async function getThread(t: TenantScope, id: string) {
   return t.run<GmailThread>("gmail.api.threads.get", { id, format: "full" });
 }
 
+/** Fetch a single message with its full MIME payload (for body extraction). */
+export async function getMessage(t: TenantScope, id: string) {
+  return t.run<GmailMessage>("gmail.api.messages.get", { id, format: "full" });
+}
+
 export async function sendEmail(
   t: TenantScope,
   opts: Parameters<typeof buildRawEmail>[0] & { threadId?: string },

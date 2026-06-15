@@ -16,6 +16,7 @@ import {
   type Category,
 } from "@/lib/ai/classify";
 import { PriorityBadge } from "@/components/mail/PriorityBadge";
+import { HoverSummary } from "@/components/mail/HoverSummary";
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
 import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
 import { UnsnoozeButton } from "@/components/mail/UnsnoozeButton";
@@ -437,6 +438,7 @@ function MessageRow({ m, p }: { m: InboxMessage; p?: RowMeta }) {
         m.unread ? "bg-(--paper)" : "bg-(--bg)/40"
       }`}
     >
+      <HoverSummary messageId={m.id} />
       <SenderAvatar from={m.from || "?"} />
       <Link
         href={`/mail/thread/${m.threadId}`}

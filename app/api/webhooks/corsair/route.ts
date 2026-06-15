@@ -5,6 +5,7 @@ import { verifyWebhookToken } from "@/lib/webhooks";
 import { publish, type RealtimeEvent } from "@/lib/realtime";
 import { listInboxMessages } from "@/lib/gmail";
 import { classifyMessages } from "@/lib/ai/classify";
+import { summarizeMessages } from "@/lib/ai/summary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -88,9 +89,14 @@ export async function POST(req: Request) {
       try {
         const t = corsairTenant(tenantId);
         const { ok, messages } = await listInboxMessages(t, { limit: 25 });
-        if (ok) await classifyMessages(user.id, messages);
+        if (ok) {
+          await classifyMessages(user.id, messages);
+          // Generate + cache one-glance summaries for new mail (chief model),
+          // so hovering an inbox row shows a summary without opening it.
+          await summarizeMessages(user.id, t, messages);
+        }
       } catch (err) {
-        console.error("webhook: classify-on-arrival failed", err);
+        console.error("webhook: classify/summarize-on-arrival failed", err);
       }
     });
   }

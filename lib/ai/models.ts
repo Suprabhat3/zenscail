@@ -44,6 +44,13 @@ export const MODELS: Record<AiProvider, { id: string; label: string; cheap?: boo
 export const CLOUD_MODEL = "gpt-5.4";
 export const CLOUD_CHEAP_MODEL = "gpt-5-nano";
 
+/**
+ * Speech-to-text model for the mic / voice-command feature. Always runs on our
+ * OPENAI_API_KEY (transcription is OpenAI-specific, independent of the user's
+ * chosen chat provider).
+ */
+export const TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe-2025-12-15";
+
 export function isValidModel(provider: AiProvider, model: string): boolean {
   return MODELS[provider]?.some((m) => m.id === model) ?? false;
 }

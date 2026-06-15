@@ -695,6 +695,13 @@ section[data-screen-label] { position: relative; }
   line-height: 1.5;
 }
 
+/* inbox hover summary card entrance */
+.zs-hover-summary { animation: zs-summary-in 0.16s ease-out; transform-origin: top left; }
+@keyframes zs-summary-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
 .demo-pane { display: none; }
 .demo-pane.active { display: block; animation: panein 0.35s ease; }
 @keyframes panein {
