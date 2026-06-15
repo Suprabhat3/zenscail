@@ -84,7 +84,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+      {/* Browser extensions (e.g. ColorZilla) inject attributes like
+          `cz-shortcut-listen` onto <body> before React hydrates, which trips a
+          dev-only hydration mismatch warning. suppressHydrationWarning silences
+          that one element without affecting real mismatches inside the app. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

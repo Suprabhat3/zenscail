@@ -18,8 +18,7 @@ export const maxDuration = 120;
 type McpTools = Awaited<ReturnType<Awaited<ReturnType<typeof createMCPClient>>["tools"]>>;
 // Minimal shape both createMCPClient and the SDK's createVercelClient satisfy.
 type McpClient = { tools: () => Promise<McpTools>; close?: () => Promise<void> | void };
-type Transport = "http" | "sse";
-type Connected = { client: McpClient; tools: McpTools; transport: Transport };
+type Connected = { client: McpClient; tools: McpTools };
 
 const CORSAIR_TENANT_HEADER = "X-Corsair-Tenant-Id";
 
@@ -34,56 +33,65 @@ function isRetriableMcpError(err: unknown): boolean {
   return /session not found|HTTP 4\d\d|does not support|transport/i.test(msg);
 }
 
-/** Build a Corsair MCP transport config by hand so we can pick http vs sse. */
-function mcpTransport(tenantId: string, type: Transport) {
+/** Build a Corsair MCP transport config by hand (HTTP only). */
+function mcpTransport(tenantId: string) {
   const cfg = corsairTenant(tenantId).mcp.config();
   const url = new URL(cfg.url);
   if (!url.searchParams.has("tenantId")) url.searchParams.set("tenantId", tenantId);
-  const headers: Record<string, string> = { [CORSAIR_TENANT_HEADER]: tenantId };
-  if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`;
-  return { type, url: url.toString(), headers };
+  const headers: Record<string, string> = { ...(cfg.headers ?? {}) };
+  if (!headers[CORSAIR_TENANT_HEADER]) headers[CORSAIR_TENANT_HEADER] = tenantId;
+  if (cfg.apiKey && !headers.Authorization) headers.Authorization = `Bearer ${cfg.apiKey}`;
+  return { type: "http" as const, url: url.toString(), headers };
 }
 
 /**
- * Connect to Corsair's hosted MCP server, tolerating its flaky sessions.
- * Tries the preferred transport (streamable HTTP) a couple of times, then
- * falls back to SSE — which is exactly what the server's 404 asks for when it
- * can't find an HTTP session. Returns null if every attempt fails so the chat
- * can still answer (just without Gmail/Calendar tools) instead of 500ing.
+ * Connect to Corsair's hosted MCP server, tolerating flaky HTTP sessions.
+ * We stay on streamable HTTP only: Corsair's hosted endpoint in this project
+ * rejects direct SSE bootstrap with 400 ("missing/invalid mcp-session-id").
  */
-async function openClient(tenantId: string, transport: Transport): Promise<McpClient> {
-  if (transport === "http") {
-    // Custom POST-only transport — avoids the SDK's background GET stream that
-    // Corsair 404s on (see lib/ai/corsair-mcp.ts).
-    const { url, headers } = mcpTransport(tenantId, "http");
-    return createMCPClient({
-      transport: new CorsairHttpTransport({ url, headers }) as never,
-    });
-  }
-  // SSE fallback, built by hand.
-  return createMCPClient({ transport: mcpTransport(tenantId, "sse") });
+async function openClient(tenantId: string): Promise<McpClient> {
+  // Custom POST-only transport — avoids the SDK's background GET stream that
+  // can intermittently invalidate the HTTP session on Corsair.
+  const { url, headers } = mcpTransport(tenantId);
+  return createMCPClient({
+    transport: new CorsairHttpTransport({ url, headers }) as never,
+  });
 }
 
-async function connectMcp(
-  tenantId: string,
-  prefer: Transport = "http",
-): Promise<Connected | null> {
-  const order: Transport[] = prefer === "http" ? ["http", "sse"] : ["sse", "http"];
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Connect to Corsair's hosted MCP server.
+ *
+ * Corsair's hosted MCP session store is intermittently inconsistent: an
+ * `initialize` POST returns a fresh `mcp-session-id`, but the next POST can
+ * 404 with `{"error":"Session not found"}` for a short window (seconds), after
+ * which a brand-new session works again. A rapid no-delay retry burst can't
+ * outlast even a brief bad window, so chat silently lost its Gmail/Calendar
+ * tools. We re-initialize with exponential backoff + jitter (≈10s total) so a
+ * transient window is absorbed. Returns null only if every attempt fails.
+ */
+async function connectMcp(tenantId: string): Promise<Connected | null> {
+  const maxAttempts = 6;
   let lastErr: unknown;
-  for (const transport of order) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      let client: McpClient | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    let client: McpClient | undefined;
+    try {
+      client = await openClient(tenantId);
+      const tools = await client.tools();
+      if (attempt > 0) {
+        console.info(`chat: MCP connected after ${attempt + 1} attempts`);
+      }
+      return { client, tools };
+    } catch (err) {
+      lastErr = err;
       try {
-        client = await openClient(tenantId, transport);
-        const tools = await client.tools();
-        return { client, tools, transport };
-      } catch (err) {
-        lastErr = err;
-        try {
-          await client?.close?.();
-        } catch {}
-        // Non-transient error (or last shot at this transport) → move on.
-        if (!isRetriableMcpError(err)) break;
+        await client?.close?.();
+      } catch {}
+      if (!isRetriableMcpError(err)) break;
+      if (attempt < maxAttempts - 1) {
+        // 0.3s, 0.6s, 1.2s, 2.4s, 4.8s (+ jitter) — spans the typical window.
+        await sleep(300 * 2 ** attempt + Math.random() * 200);
       }
     }
   }
@@ -107,7 +115,7 @@ function resilientMcpTools(
   let current = initial;
 
   async function reconnect() {
-    const next = await connectMcp(tenantId, current.transport);
+    const next = await connectMcp(tenantId);
     if (!next) throw new Error("MCP reconnect failed");
     clients.push(next.client);
     current = next;

@@ -97,6 +97,28 @@ try {
   console.log("  FAILED:", err instanceof Error ? err.message : err);
 }
 
+// 3. Tenant-scoped MCP key (HTTP).
+try {
+  console.log("\n→ HTTP via tenant.mcpKeys.create (createMCPClient)…");
+  const key = await tenant.mcpKeys.create("mcp-probe-temp");
+  try {
+    const client = await createMCPClient({
+      transport: {
+        type: "http",
+        url: key.mcpHttpUrl,
+        headers: { Authorization: `Bearer ${key.secret}` },
+      },
+    });
+    const tools = await client.tools();
+    console.log("  OK. tools:", Object.keys(tools).length);
+    await client.close?.();
+  } finally {
+    await tenant.mcpKeys.revoke(key.id);
+  }
+} catch (err) {
+  console.log("  FAILED:", err instanceof Error ? err.message : err);
+}
+
 // 1b. HTTP via our custom POST-only transport, run 5× to check reliability.
 const u = new URL(cfg.url);
 if (!u.searchParams.has("tenantId")) u.searchParams.set("tenantId", tenantId);
