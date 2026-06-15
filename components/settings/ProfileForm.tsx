@@ -12,10 +12,12 @@ type Notice = { tone: "ok" | "err"; text: string } | null;
 export function ProfileForm({
   name: initialName,
   email,
+  connectedMailbox,
   createdAt,
 }: {
   name: string;
   email: string;
+  connectedMailbox?: string | null;
   createdAt?: string;
 }) {
   const router = useRouter();
@@ -98,9 +100,18 @@ export function ProfileForm({
             Email
             <input type="email" value={email} disabled className={inputClass} />
             <span className="mt-1.5 block text-xs text-(--muted)">
-              Your email is your sign-in identity and can&apos;t be changed here.
+              Your sign-in email for ZenScail. Manage your Gmail connection under Connected accounts.
             </span>
           </label>
+          {connectedMailbox && (
+            <label className="block text-sm font-medium text-(--ink)">
+              Connected mailbox
+              <input type="email" value={connectedMailbox} disabled className={inputClass} />
+              <span className="mt-1.5 block text-xs text-(--muted)">
+                Mail and calendar actions use this Gmail account.
+              </span>
+            </label>
+          )}
           <NoticeBox notice={nameNotice} />
           <button
             disabled={savingName || name.trim() === initialName.trim() || !name.trim()}

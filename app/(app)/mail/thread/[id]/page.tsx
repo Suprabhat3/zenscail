@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/session";
+import { getAppIdentityForUser, isFromMe } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import {
@@ -105,6 +106,7 @@ export default async function ThreadPage({
 }) {
   const { id } = await params;
   const session = await requireSession();
+  const identity = await getAppIdentityForUser(session.user.id, session.user);
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
 
@@ -143,7 +145,7 @@ export default async function ThreadPage({
   const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
   const replyTo =
     header(last?.payload, "Reply-To") ||
-    (lastFrom.includes(session.user.email) ? header(last?.payload, "To") : lastFrom);
+    (isFromMe(lastFrom, identity) ? header(last?.payload, "To") : lastFrom);
 
   const participants = Array.from(
     new Set(messages.map((m) => parseSender(header(m.payload, "From")).name).filter(Boolean)),
@@ -215,6 +217,9 @@ export default async function ThreadPage({
           </svg>
           Reply
         </h2>
+        <p className="mt-2 text-xs text-(--muted)">
+          From <span className="text-(--ink-soft)">{identity.primaryEmail}</span>
+        </p>
         <input type="hidden" name="threadId" value={thread.id ?? id} />
         <input type="hidden" name="subject" value={replySubject} />
         <input type="hidden" name="inReplyTo" value={lastMessageId} />

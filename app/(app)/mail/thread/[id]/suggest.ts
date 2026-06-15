@@ -3,6 +3,7 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import { requireSession } from "@/lib/session";
+import { getAppIdentityForUser } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getModelForUser } from "@/lib/ai/registry";
@@ -41,6 +42,7 @@ export async function suggestReplies(threadId: string): Promise<ReplySuggestion[
 
   try {
     const session = await requireSession();
+    const identity = await getAppIdentityForUser(session.user.id, session.user);
     const tenantId = await ensureCorsairTenant(session.user.id);
     const t = corsairTenant(tenantId);
 
@@ -66,7 +68,7 @@ export async function suggestReplies(threadId: string): Promise<ReplySuggestion[
       model: cheapModel,
       schema: SuggestionsSchema,
       system: SYSTEM,
-      prompt: `You are replying to ${session.user.email}'s inbox.
+      prompt: `You are replying on behalf of ${identity.primaryEmail}.
 
 From: ${from}
 Subject: ${subject}

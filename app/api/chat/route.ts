@@ -7,6 +7,7 @@ import {
 import { createMCPClient } from "@ai-sdk/mcp";
 import { CorsairHttpTransport } from "@/lib/ai/corsair-mcp";
 import { requireSession } from "@/lib/session";
+import { getAppIdentityForUser, mailboxContextLine } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getModelForUser } from "@/lib/ai/registry";
@@ -139,6 +140,7 @@ function resilientMcpTools(
 
 export async function POST(req: Request) {
   const session = await requireSession();
+  const identity = await getAppIdentityForUser(session.user.id, session.user);
   const tenantId = await ensureCorsairTenant(session.user.id);
 
   const body: { messages: UIMessage[]; model?: string } = await req.json();
@@ -179,7 +181,7 @@ export async function POST(req: Request) {
   const system = [
     "You are ZenScail, an assistant that manages the user's Gmail and Google Calendar using the tools available to you.",
     `Current date and time: ${now.toISOString()} (${now.toUTCString()}).`,
-    `The user's email address is ${session.user.email}; their name is ${session.user.name}.`,
+    mailboxContextLine(identity),
     "Resolve relative dates ('next Thursday', 'tomorrow at 9') against the current date above. If a timezone matters and is ambiguous, ask.",
     "Before sending email or creating/modifying events, state what you're about to do. Report what you actually did, including failures.",
     "Keep replies short and practical. Format responses in markdown (lists, bold, tables where helpful).",

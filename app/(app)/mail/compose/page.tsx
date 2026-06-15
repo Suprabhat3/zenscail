@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireSession } from "@/lib/session";
+import { requireAppIdentity } from "@/lib/identity";
 import { RecipientField } from "@/components/mail/RecipientField";
 import { SendBar } from "@/components/mail/SendBar";
 import { SmartComposeTextarea } from "@/components/mail/SmartComposeTextarea";
@@ -16,8 +16,8 @@ export default async function ComposePage({
   searchParams: Promise<{ to?: string; subject?: string; body?: string }>;
 }) {
   const { to, subject, body } = await searchParams;
-  const session = await requireSession();
-  const me = session.user.email;
+  const { identity } = await requireAppIdentity();
+  const me = identity.primaryEmail;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">

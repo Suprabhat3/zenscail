@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { corsairTenant } from "@/lib/corsair";
 import { getConnectedAddress } from "@/lib/gmail";
+import { requireSession } from "@/lib/session";
 
 /**
  * Resolve and persist the real Gmail address connected via Corsair. The app
@@ -66,4 +67,46 @@ export function resolveIdentity(user: {
     mismatch,
     connectedEmail: connected,
   };
+}
+
+/** Load connectedEmail from the DB and build the display identity for a user. */
+export async function getAppIdentityForUser(
+  userId: string,
+  user: { name: string; email: string; image?: string | null },
+): Promise<AppIdentity> {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { connectedEmail: true },
+  });
+  return resolveIdentity({ ...user, connectedEmail: dbUser?.connectedEmail });
+}
+
+/** Signed-in session plus the resolved mailbox identity. */
+export async function requireAppIdentity() {
+  const session = await requireSession();
+  const identity = await getAppIdentityForUser(session.user.id, session.user);
+  return { session, identity };
+}
+
+/** Email addresses that count as the user's own for inbox logic. */
+export function myAddressSet(identity: AppIdentity): Set<string> {
+  return new Set(
+    [identity.loginEmail, identity.connectedEmail]
+      .filter((v): v is string => Boolean(v))
+      .map((v) => v.toLowerCase()),
+  );
+}
+
+/** Whether a raw From/Reply-To header value is one of the user's addresses. */
+export function isFromMe(fromHeader: string, identity: AppIdentity): boolean {
+  const lower = fromHeader.toLowerCase();
+  return [...myAddressSet(identity)].some((addr) => lower.includes(addr));
+}
+
+/** System-prompt line for AI features — mailbox first, login email when it differs. */
+export function mailboxContextLine(identity: AppIdentity): string {
+  if (identity.mismatch) {
+    return `The user's connected Gmail mailbox is ${identity.primaryEmail}; their ZenScail login email is ${identity.loginEmail}; their name is ${identity.displayName}.`;
+  }
+  return `The user's email address is ${identity.primaryEmail}; their name is ${identity.displayName}.`;
 }

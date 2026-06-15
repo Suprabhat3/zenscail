@@ -5,6 +5,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/session";
+import { getAppIdentityForUser, mailboxContextLine } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getModelForUser } from "@/lib/ai/registry";
@@ -106,6 +107,7 @@ const IntentSchema = z.object({
 export async function quickAdd(text: string): Promise<QuickAddIntent> {
   const trimmed = text.trim();
   const session = await requireSession();
+  const identity = await getAppIdentityForUser(session.user.id, session.user);
   if (!trimmed) return { kind: "agent", confirm: "Ask the assistant", text: trimmed };
 
   let parsed: z.infer<typeof IntentSchema>;
@@ -119,7 +121,7 @@ export async function quickAdd(text: string): Promise<QuickAddIntent> {
       system: [
         "You convert a single line of natural language into one structured action for an email + calendar app.",
         `Current date and time: ${now.toISOString()} (${now.toUTCString()}). Default timezone: ${tz}.`,
-        `The user's email is ${session.user.email}; their name is ${session.user.name}.`,
+        mailboxContextLine(identity),
         "Resolve relative dates ('tomorrow 1pm', 'Friday 10am', 'next Thursday') against the current time and emit absolute ISO 8601 datetimes with an offset.",
         "Pick 'event' for scheduling/meetings, 'email' when they want to write/send a message, 'search' for finding mail, and 'agent' for anything multi-step, vague, or that needs back-and-forth.",
         "Only fill fields relevant to the chosen kind; leave the rest null/empty. Never invent attendee emails that aren't present.",

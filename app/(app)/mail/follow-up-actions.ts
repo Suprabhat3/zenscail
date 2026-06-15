@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/session";
+import { getAppIdentityForUser, myAddressSet } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getThread, header } from "@/lib/gmail";
@@ -18,6 +19,7 @@ export async function createFollowUp(threadId: string, days: number, note?: stri
   if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid reminder window");
 
   const session = await requireSession();
+  const identity = await getAppIdentityForUser(session.user.id, session.user);
   const userId = session.user.id;
   const tenantId = await ensureCorsairTenant(userId);
   const t = corsairTenant(tenantId);
@@ -31,13 +33,12 @@ export async function createFollowUp(threadId: string, days: number, note?: stri
   const subject = header(messages[0].payload, "Subject") || "(no subject)";
   // The party we're waiting on: the most recent sender that isn't us. Falls
   // back to the latest sender. Stored for display only.
-  const me = (session.user.email || "").toLowerCase();
-  const connected = (session.user as { connectedEmail?: string }).connectedEmail?.toLowerCase();
+  const mine = myAddressSet(identity);
   let contact = "";
   for (let i = messages.length - 1; i >= 0; i--) {
     const from = header(messages[i].payload, "From");
     const lower = from.toLowerCase();
-    if (!lower.includes(me) && (!connected || !lower.includes(connected))) {
+    if (![...mine].some((addr) => lower.includes(addr))) {
       contact = from;
       break;
     }

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { getChatModelOptions } from "@/lib/ai/registry";
-import { prisma } from "@/lib/prisma";
-import { resolveIdentity } from "@/lib/identity";
+import { getAppIdentityForUser } from "@/lib/identity";
 import { AppNav } from "@/components/app/AppNav";
 import { UserMenu } from "@/components/app/UserMenu";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
@@ -24,16 +23,7 @@ export default async function AppLayout({
   const session = await requireSession();
   const chatOptions = await getChatModelOptions(session.user.id);
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { connectedEmail: true },
-  });
-  const identity = resolveIdentity({
-    name: session.user.name,
-    email: session.user.email,
-    image: session.user.image,
-    connectedEmail: dbUser?.connectedEmail,
-  });
+  const identity = await getAppIdentityForUser(session.user.id, session.user);
 
   return (
     <ChatProvider>
