@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { LoginForm } from "@/components/auth/LoginForm";
@@ -29,16 +30,7 @@ export default async function LoginPage({
           href="/"
           className="mb-8 flex items-center gap-2 font-serif text-xl text-(--ink) lg:hidden"
         >
-          <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
-            <path
-              d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-            />
-            <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
-          </svg>
+          <Image src="/logo.png" alt="ZenScail" width={29} height={26} />
           ZenScail
         </Link>
         <LoginForm

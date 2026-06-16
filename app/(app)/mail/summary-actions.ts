@@ -5,8 +5,6 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getEmailSummaryFor, type EmailSummaryData } from "@/lib/ai/summary";
 
-export type { EmailSummaryData };
-
 /**
  * Fetch (or lazily generate + cache) the one-glance summary for an inbox
  * message. Backs the hover card. Best-effort: returns null on any failure so

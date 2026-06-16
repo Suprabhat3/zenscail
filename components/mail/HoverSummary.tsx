@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getEmailSummary, type EmailSummaryData } from "@/app/(app)/mail/summary-actions";
+import { getEmailSummary } from "@/app/(app)/mail/summary-actions";
+import type { EmailSummaryData } from "@/lib/ai/summary";
 
 // Per-session cache so re-hovering a row never re-fetches. `null` = no summary.
 const cache = new Map<string, EmailSummaryData | null>();

@@ -115,6 +115,8 @@ button { font-family: inherit; cursor: pointer; }
   letter-spacing: -0.01em;
 }
 .logo svg { display: block; }
+.logo img { display: block; height: 30px; width: auto; }
+.footer .logo img { height: 24px; }
 .nav-links {
   display: flex;
   align-items: center;
@@ -1145,6 +1147,7 @@ section[data-screen-label] { position: relative; }
   .nav-inner { height: 64px; }
   .logo { font-size: 22px; }
   .logo svg { width: 26px; height: 26px; }
+  .logo img { height: 26px; width: auto; }
 
   /* hero */
   .hero { padding: 40px 0 72px; }

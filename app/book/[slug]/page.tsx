@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getBookingLink, computeOpenSlots } from "@/lib/booking";
@@ -26,10 +27,7 @@ export default async function BookPage({
     <div className="min-h-screen bg-(--bg) text-(--ink)">
       <div className="mx-auto max-w-xl px-6 py-12">
         <div className="flex items-center gap-2 font-serif text-lg text-(--ink)">
-          <svg width="24" height="24" viewBox="0 0 30 30" aria-hidden="true">
-            <path d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-            <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
-          </svg>
+          <Image src="/logo.png" alt="ZenScail" width={27} height={24} />
           ZenScail
         </div>
 

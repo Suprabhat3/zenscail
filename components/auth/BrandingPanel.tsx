@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 const SLIDES = [
   {
@@ -75,16 +76,7 @@ export function BrandingPanel() {
   return (
     <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden border-r border-(--line-soft) bg-(--bg-deep) p-10 lg:flex">
       <Link href="/" className="flex items-center gap-2 font-serif text-xl text-(--ink)">
-        <svg width="28" height="28" viewBox="0 0 30 30" aria-hidden="true">
-          <path
-            d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
-          <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
-        </svg>
+        <Image src="/logo.png" alt="ZenScail" width={31} height={28} />
         ZenScail
       </Link>
 

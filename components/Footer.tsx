@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export function Footer() {
   return (
     <footer className="footer">
@@ -5,16 +7,7 @@ export function Footer() {
         <div className="footer-grid">
           <div>
             <a className="logo" href="/">
-              <svg width="24" height="24" viewBox="0 0 30 30" aria-hidden="true">
-                <path
-                  d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
-                  fill="none"
-                  stroke="var(--ink)"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                />
-                <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
-              </svg>
+              <Image src="/logo.png" alt="ZenScail" width={27} height={24} />
               <span>ZenScail</span>
             </a>
             <p className="footer-tag">

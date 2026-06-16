@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession } from "@/lib/auth-client";
 
 export function Nav() {
@@ -19,16 +20,7 @@ export function Nav() {
     <nav className={`nav${scrolled ? " scrolled" : ""}`}>
       <div className="wrap nav-inner">
         <a className="logo" href="/">
-          <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-            <path
-              d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
-              fill="none"
-              stroke="var(--ink)"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-            />
-            <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
-          </svg>
+          <Image src="/logo.png" alt="ZenScail" width={33} height={30} priority />
           <span>ZenScail</span>
         </a>
         <div className="nav-links">
