@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Reveal } from "./Reveal";
 import { CLOUD_PLAN } from "@/lib/plan";
+import { CloudPlanCta } from "./CloudPlanCta";
 
 const Check = ({ color }: { color: string }) => (
   <svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true">
@@ -102,9 +103,9 @@ export function Pricing() {
                 <span>Priority support and early features</span>
               </li>
             </ul>
-            <Link className="btn btn-accent" href="/login?mode=signup">
-              Get ZenScail Cloud
-            </Link>
+            <div style={{ marginTop: 8 }}>
+              <CloudPlanCta />
+            </div>
           </Reveal>
         </div>
         <Reveal className="privacy-callout">

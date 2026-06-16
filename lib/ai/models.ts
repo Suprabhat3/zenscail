@@ -52,7 +52,7 @@ export const PROVIDER_BY_ID: Record<AiProvider, ProviderInfo> = Object.fromEntri
 export const MODELS: Record<AiProvider, { id: string; label: string; cheap?: boolean }[]> = {
   openai: [
     { id: "gpt-5.4", label: "GPT-5.4" },
-    { id: "gpt-5.3-codex", label: "GPT-5.3 codex" },
+    { id: "gpt-5.2", label: "GPT-5.2" },
     { id: "gpt-5.4-mini", label: "GPT-5.4 mini" },
     { id: "gpt-5.4-nano", label: "GPT-5.4 nano", cheap: true },
     { id: "gpt-5-nano", label: "GPT-5 nano", cheap: true }

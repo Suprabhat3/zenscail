@@ -27,13 +27,10 @@ export function HoverSummary({ messageId }: { messageId: string }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetched = useRef(false);
-  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<Pos | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [data, setData] = useState<EmailSummaryData | null>(null);
-
-  useEffect(() => setMounted(true), []);
 
   const load = useCallback(async () => {
     if (cache.has(messageId)) {
@@ -112,7 +109,7 @@ export function HoverSummary({ messageId }: { messageId: string }) {
 
   return (
     <span ref={anchorRef} className="hidden" aria-hidden>
-      {mounted && open && pos
+      {open && pos
         ? createPortal(
             <SummaryCard pos={pos} status={status} data={data} />,
             document.body,
@@ -153,7 +150,7 @@ function SummaryCard({
         </div>
 
         <div className="px-4 py-3.5">
-          {status === "loading" && <SummarySkeleton />}
+          {status === "loading" && <SummaryLoading />}
 
           {status === "empty" && (
             <p className="text-sm text-(--muted)">No summary available for this email yet.</p>
@@ -192,13 +189,46 @@ function SummaryCard({
   );
 }
 
-function SummarySkeleton() {
+const LOADING_MESSAGES = [
+  "Reading your email…",
+  "Pulling out the key points…",
+  "Refining what matters…",
+  "Writing your summary…",
+];
+
+/**
+ * Branded loading state for the summary card. Generating a fresh summary takes
+ * a couple of seconds, so instead of a blank/plain skeleton we rotate a few
+ * calm one-liners over a soft shimmer to keep the wait feeling alive.
+ */
+function SummaryLoading() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(
+      () => setI((n) => (n + 1) % LOADING_MESSAGES.length),
+      1300,
+    );
+    return () => clearInterval(id);
+  }, []);
+
   return (
-    <div className="animate-pulse space-y-2.5">
-      <div className="h-3.5 w-full rounded bg-(--line-soft)" />
-      <div className="h-3.5 w-4/5 rounded bg-(--line-soft)" />
-      <div className="mt-3 h-3 w-3/5 rounded bg-(--line-soft)" />
-      <div className="h-3 w-2/3 rounded bg-(--line-soft)" />
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="zs-halo relative flex h-4 w-4 items-center justify-center">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-(--accent)" aria-hidden>
+            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+          </svg>
+        </span>
+        <span key={i} className="zs-msg text-[13px] font-medium text-(--ink-soft)">
+          {LOADING_MESSAGES[i]}
+        </span>
+      </div>
+      <div className="animate-pulse space-y-2.5">
+        <div className="h-3.5 w-full rounded bg-(--line-soft)" />
+        <div className="h-3.5 w-4/5 rounded bg-(--line-soft)" />
+        <div className="mt-3 h-3 w-3/5 rounded bg-(--line-soft)" />
+        <div className="h-3 w-2/3 rounded bg-(--line-soft)" />
+      </div>
     </div>
   );
 }

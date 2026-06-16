@@ -47,6 +47,9 @@ model Subscription {
   // End of the current paid period (epoch seconds from Razorpay → DateTime),
   // so we can show renewal date and grace-handle near expiry.
   currentEnd             DateTime? @map("current_end")
+  // Set when the user cancels at cycle end: the subscription stays "active"
+  // (and Cloud keeps working) until `currentEnd`, then stops renewing.
+  cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 

@@ -7,6 +7,7 @@ import { getChatModelOptions } from "@/lib/ai/registry";
 import { getAppIdentityForUser } from "@/lib/identity";
 import { AppNav } from "@/components/app/AppNav";
 import { UserMenu } from "@/components/app/UserMenu";
+import { PlanBadge } from "@/components/app/PlanBadge";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
 import { LiveUpdates } from "@/components/realtime/LiveUpdates";
 import { ChatProvider } from "@/components/chat/ChatProvider";
@@ -55,6 +56,13 @@ export default async function AppLayout({
 
   const identity = await getAppIdentityForUser(session.user.id, session.user);
 
+  // Always-visible plan indicator. Cloud only when the subscription is active;
+  // otherwise the user is running on their own key (or grandfathered legacy).
+  const plan: "cloud" | "byok" =
+    gateUser?.aiSettings?.tier === "cloud" && isActiveStatus(gateUser.subscription?.status)
+      ? "cloud"
+      : "byok";
+
   return (
     <ChatProvider>
       <CommandProvider>
@@ -64,6 +72,7 @@ export default async function AppLayout({
           <AppNav />
           <QuickAddBar />
           <div className="flex items-center gap-3">
+            <PlanBadge plan={plan} />
             <ChatLauncher />
             <UserMenu
               name={identity.displayName}

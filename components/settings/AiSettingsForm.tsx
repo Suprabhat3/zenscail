@@ -22,16 +22,65 @@ const ExternalIcon = () => (
 export function AiSettingsForm({
   action,
   initial,
+  cloudActive = false,
 }: {
   action: (formData: FormData) => Promise<void>;
   initial: { tier: "cloud" | "byok"; provider?: AiProvider; model?: string; hasKey: boolean };
+  /** User has a live Cloud subscription — warn before they switch to BYOK. */
+  cloudActive?: boolean;
 }) {
   const [tier, setTier] = useState<"cloud" | "byok">(initial.tier);
   const [provider, setProvider] = useState<AiProvider>(initial.provider ?? "openai");
+  const [warnByok, setWarnByok] = useState(false);
   const selected = PROVIDER_BY_ID[provider];
+
+  // If the user has active Cloud, switching to BYOK is redundant — confirm first.
+  function chooseTier(value: "cloud" | "byok") {
+    if (value === "byok" && cloudActive && tier !== "byok") {
+      setWarnByok(true);
+      return;
+    }
+    setTier(value);
+  }
 
   return (
     <div className="space-y-5">
+      {warnByok && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-(--line-soft) bg-(--paper) p-6 shadow-(--shadow-card)">
+            <h3 className="font-serif text-xl text-(--ink)">You already have Cloud</h3>
+            <p className="mt-2 text-sm leading-relaxed text-(--ink-soft)">
+              Your ZenScail Cloud subscription is active, so you don&rsquo;t need your own
+              API key — everything already works. You can still add one if you prefer,
+              but you&rsquo;ll keep being billed for Cloud. You can switch back anytime
+              from{" "}
+              <a href="/settings/billing" className="font-medium text-(--ink) underline">
+                Billing
+              </a>
+              .
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setWarnByok(false)}
+                className="rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)"
+              >
+                Keep Cloud
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTier("byok");
+                  setWarnByok(false);
+                }}
+                className="rounded-full border border-(--line) px-5 py-2.5 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+              >
+                Use my own key anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="rounded-2xl border border-(--line-soft) bg-(--paper) p-6 shadow-(--shadow-card)">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">AI model</h2>
         <form action={action} className="mt-5 space-y-5">
@@ -62,7 +111,7 @@ export function AiSettingsForm({
                   name="tier"
                   value={opt.value}
                   checked={tier === opt.value}
-                  onChange={() => setTier(opt.value as "cloud" | "byok")}
+                  onChange={() => chooseTier(opt.value as "cloud" | "byok")}
                   className="mt-0.5 accent-(--accent)"
                 />
                 <span>

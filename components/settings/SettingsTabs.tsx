@@ -7,6 +7,7 @@ const TABS = [
   { href: "/settings/profile", label: "Profile" },
   { href: "/settings/mail", label: "Mail" },
   { href: "/settings/ai", label: "AI models" },
+  { href: "/settings/billing", label: "Billing" },
   { href: "/connect", label: "Connected accounts" },
 ];
 

@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 import { AiSettingsForm } from "@/components/settings/AiSettingsForm";
 import { saveAiSettings, testAiKey } from "./actions";
 import type { AiProvider } from "@/lib/ai/models";
@@ -24,6 +25,7 @@ export default async function AiSettingsPage({
   const settings = await prisma.userAiSettings.findUnique({
     where: { userId: session.user.id },
   });
+  const cloudActive = await hasActiveSubscription(session.user.id);
 
   const bannerKey = saved ? "saved" : test ? `test-${test}` : error ? `error-${error}` : null;
   const banner = bannerKey ? banners[bannerKey] : null;
@@ -50,6 +52,7 @@ export default async function AiSettingsPage({
 
       <AiSettingsForm
         action={saveAiSettings}
+        cloudActive={cloudActive}
         initial={{
           tier: isByok ? "byok" : "cloud",
           provider: (settings?.provider as AiProvider | null) ?? undefined,

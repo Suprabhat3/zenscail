@@ -39,6 +39,8 @@ export type RazorpaySubscription = {
   plan_id: string;
   status: string;
   current_end: number | null;
+  /** True once a cancel-at-cycle-end has been scheduled. */
+  has_scheduled_changes?: boolean;
   short_url?: string;
 };
 
@@ -73,6 +75,27 @@ export async function fetchSubscription(id: string): Promise<RazorpaySubscriptio
   });
   if (!res.ok) {
     throw new Error(`Razorpay fetchSubscription failed (${res.status})`);
+  }
+  return (await res.json()) as RazorpaySubscription;
+}
+
+/**
+ * Cancel a subscription. `atCycleEnd` (default) keeps it active until the end
+ * of the paid period — Razorpay stops it renewing but the user keeps access
+ * until `current_end`, so no refund is owed. Pass `false` to cancel now.
+ */
+export async function cancelSubscription(
+  id: string,
+  atCycleEnd = true,
+): Promise<RazorpaySubscription> {
+  const res = await fetch(`${API_BASE}/subscriptions/${id}/cancel`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({ cancel_at_cycle_end: atCycleEnd ? 1 : 0 }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Razorpay cancelSubscription failed (${res.status}): ${detail}`);
   }
   return (await res.json()) as RazorpaySubscription;
 }
