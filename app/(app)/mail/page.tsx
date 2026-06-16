@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cookies } from "next/headers";
 import type { InboxMessage } from "@/lib/gmail";
 import { requireSession } from "@/lib/session";
@@ -15,6 +16,7 @@ import {
   type Priority,
   type Category,
 } from "@/lib/ai/classify";
+import { summarizeMessages } from "@/lib/ai/summary";
 import { PriorityBadge } from "@/components/mail/PriorityBadge";
 import { HoverSummary } from "@/components/mail/HoverSummary";
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
@@ -209,6 +211,22 @@ export default async function MailPage({
       userId,
       messages.map((m) => m.id).filter((id): id is string => Boolean(id)),
     );
+
+    // Backfill one-glance summaries for the mail currently shown — not just new
+    // arrivals (which the webhook handles). Deferred so it never blocks render,
+    // and skips low-priority mail for efficiency. Classification has already run
+    // above, so summarizeMessages can consult priorities. Hovering remains the
+    // lazy fallback for anything this skips or hasn't reached yet.
+    const toSummarize = messages;
+    if (toSummarize.length > 0) {
+      after(async () => {
+        try {
+          await summarizeMessages(userId, t, toSummarize);
+        } catch {
+          // best-effort; the hover path regenerates on demand
+        }
+      });
+    }
 
     if (urgentFirst) {
       messages = [...messages].sort((a, b) => {

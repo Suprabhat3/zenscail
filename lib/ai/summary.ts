@@ -5,6 +5,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getModelForUser } from "./registry";
+import { getPriorities } from "./classify";
 import { getMessage, extractBodies, header } from "@/lib/gmail";
 
 /** Structured one-glance summary shown in the inbox hover card. */
@@ -126,15 +127,24 @@ export async function getEmailSummaryFor(
 }
 
 /**
- * Pre-generate summaries for a batch of freshly-arrived messages (called from
- * the inbound webhook so they're ready before the user hovers). Skips messages
- * already summarized; best-effort and bounded so it never overruns.
+ * Pre-generate summaries for a batch of messages — both freshly-arrived mail
+ * (from the inbound webhook) and the older mail already shown in the inbox (from
+ * the mail page, so past emails get backfilled, not just new ones). Skips
+ * messages already summarized.
+ *
+ * For efficiency we skip low-priority mail (newsletters, marketing, social,
+ * automated notifications) — the user is unlikely to open it, so proactively
+ * summarizing it just burns LLM calls. Hovering such a row still summarizes it
+ * lazily via getEmailSummaryFor, which honours that explicit intent. Pass
+ * `includeLowPriority` to summarize everything regardless of classification.
+ *
+ * Best-effort and bounded so it never overruns.
  */
 export async function summarizeMessages(
   userId: string,
   t: TenantScope,
   messages: { id?: string }[],
-  opts: { limit?: number } = {},
+  opts: { limit?: number; includeLowPriority?: boolean } = {},
 ): Promise<number> {
   const limit = opts.limit ?? 10;
   const ids = messages.map((m) => m.id).filter((id): id is string => Boolean(id));
@@ -145,7 +155,17 @@ export async function summarizeMessages(
     select: { gmailMessageId: true },
   });
   const seen = new Set(existing.map((e) => e.gmailMessageId));
-  const todo = ids.filter((id) => !seen.has(id)).slice(0, limit);
+  let candidates = ids.filter((id) => !seen.has(id));
+
+  // Drop mail the user is unlikely to open. Messages with no stored meta are
+  // kept (summarize-if-unknown is the safe default — classification may just
+  // not have run yet).
+  if (!opts.includeLowPriority && candidates.length > 0) {
+    const meta = await getPriorities(userId, candidates);
+    candidates = candidates.filter((id) => meta.get(id)?.priority !== "low");
+  }
+
+  const todo = candidates.slice(0, limit);
   if (todo.length === 0) return 0;
 
   const results = await Promise.allSettled(
