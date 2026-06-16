@@ -1,6 +1,6 @@
 "use client";
 
-import { Waitlist } from "./Waitlist";
+import { BetaCta } from "./BetaCta";
 import { useTypewriter } from "./useTypewriter";
 
 const BRIEF_HTML =
@@ -21,7 +21,23 @@ export function Hero() {
       </div>
       <div className="wrap hero-grid">
         <div className="reveal in-view">
-          <span className="eyebrow">Email + calendar + AI</span>
+          <span className="eyebrow">
+            Email + calendar + AI
+            <span
+              style={{
+                marginLeft: 10,
+                padding: "2px 10px",
+                borderRadius: 99,
+                background: "var(--accent-soft)",
+                color: "var(--accent-deep)",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+              }}
+            >
+              NOW IN BETA
+            </span>
+          </span>
           <h1 className="display" style={{ marginTop: 20 }}>
             Your day,
             <br />
@@ -38,7 +54,7 @@ export function Hero() {
             Every morning, one calm brief: what matters, what can wait, and
             what&rsquo;s already handled for you.
           </p>
-          <Waitlist showNote />
+          <BetaCta showNote />
         </div>
 
         <div className="hero-visual" aria-hidden="true">

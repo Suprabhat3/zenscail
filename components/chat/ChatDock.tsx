@@ -490,7 +490,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
                   }
                 }}
                 placeholder="Ask anything…  (Shift+Enter for a new line)"
-                className="min-w-0 flex-1 resize-none rounded-2xl border border-(--line) bg-(--paper) px-4 py-2.5 text-sm leading-relaxed text-(--ink) [scrollbar-width:none] placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft) [&::-webkit-scrollbar]:hidden"
+                className="min-w-0 flex-1 resize-none rounded-2xl border border-(--line) bg-(--paper) px-4 py-2.5 text-sm leading-relaxed text-(--ink) scrollbar-none placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft) [&::-webkit-scrollbar]:hidden"
               />
               <MicButton onText={(t) => { setInput((p) => (p ? `${p.trimEnd()} ` : "") + t); taRef.current?.focus(); }} onError={toast} disabled={busy} />
               <button

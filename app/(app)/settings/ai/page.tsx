@@ -28,39 +28,39 @@ export default async function AiSettingsPage({
   const bannerKey = saved ? "saved" : test ? `test-${test}` : error ? `error-${error}` : null;
   const banner = bannerKey ? banners[bannerKey] : null;
 
+  const isByok = settings?.tier === "byok";
+
   return (
-    <div>
-      <p className="text-sm text-neutral-400">
-        Choose the model that powers chat and email priority filtering.
+    <div className="space-y-5">
+      <p className="text-sm text-(--ink-soft)">
+        Choose the model that powers your daily brief, inbox priorities, and chat.
       </p>
 
       {banner && (
         <div
-          className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+          className={`rounded-xl border px-4 py-3 text-sm ${
             banner.tone === "ok"
-              ? "border-emerald-900/60 bg-emerald-950/40 text-emerald-300"
-              : "border-red-900/60 bg-red-950/40 text-red-300"
+              ? "border-[#CBD8BC] bg-[#EFF4E8] text-[#44532F]"
+              : "border-(--accent)/30 bg-(--accent-soft) text-(--accent-deep)"
           }`}
         >
           {banner.text}
         </div>
       )}
 
-      <div className="mt-6 p-5">
-        <AiSettingsForm
-          action={saveAiSettings}
-          initial={{
-            tier: settings?.tier === "byok" ? "byok" : "cloud",
-            provider: (settings?.provider as AiProvider | null) ?? undefined,
-            model: settings?.model ?? undefined,
-            hasKey: Boolean(settings?.encryptedApiKey),
-          }}
-        />
-      </div>
+      <AiSettingsForm
+        action={saveAiSettings}
+        initial={{
+          tier: isByok ? "byok" : "cloud",
+          provider: (settings?.provider as AiProvider | null) ?? undefined,
+          model: settings?.model ?? undefined,
+          hasKey: Boolean(settings?.encryptedApiKey),
+        }}
+      />
 
-      {settings?.tier === "byok" && settings.encryptedApiKey && (
-        <form action={testAiKey} className="mt-4">
-          <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">
+      {isByok && settings?.encryptedApiKey && (
+        <form action={testAiKey}>
+          <button className="rounded-full border border-(--line) px-5 py-2.5 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)">
             Test API key
           </button>
         </form>

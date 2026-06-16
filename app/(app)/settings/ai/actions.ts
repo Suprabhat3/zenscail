@@ -9,7 +9,7 @@ import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { modelInstance } from "@/lib/ai/registry";
 import { isValidModel, type AiProvider } from "@/lib/ai/models";
 
-const PROVIDER_IDS = ["openai", "anthropic", "google"] as const;
+const PROVIDER_IDS = ["openai", "anthropic", "google", "groq"] as const;
 
 function parseProvider(value: string): AiProvider {
   if (!(PROVIDER_IDS as readonly string[]).includes(value)) {

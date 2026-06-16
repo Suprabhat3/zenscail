@@ -19,13 +19,38 @@ model User {
   connectedEmail  String?   @map("connected_email")
   // Set once the welcome/onboarding email has been sent, so it's never duplicated.
   welcomedAt      DateTime? @map("welcomed_at")
+  // Set when the user finishes the first-run onboarding wizard (connect + AI choice).
+  // Used to gate /onboarding; existing connected users are treated as onboarded.
+  onboardedAt     DateTime? @map("onboarded_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   sessions        Session[]
   accounts        Account[]
   aiSettings      UserAiSettings?
+  subscription    Subscription?
 
   @@map("user")
+}
+
+model Subscription {
+  id        Int    @id @default(autoincrement())
+  userId    String @unique @map("user_id")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The Razorpay subscription id (sub_xxx) this row tracks.
+  razorpaySubscriptionId String  @unique @map("razorpay_subscription_id")
+  // The Razorpay plan id it was created against (plan_xxx).
+  razorpayPlanId         String? @map("razorpay_plan_id")
+  // Mirrors Razorpay's subscription status, kept in sync by the webhook:
+  // "created" | "authenticated" | "active" | "pending" | "halted" |
+  // "cancelled" | "completed" | "expired". Cloud access requires "active".
+  status                 String  @default("created")
+  // End of the current paid period (epoch seconds from Razorpay → DateTime),
+  // so we can show renewal date and grace-handle near expiry.
+  currentEnd             DateTime? @map("current_end")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("subscription")
 }
 
 model UserAiSettings {

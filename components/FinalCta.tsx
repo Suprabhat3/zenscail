@@ -1,5 +1,5 @@
 import { Reveal } from "./Reveal";
-import { Waitlist } from "./Waitlist";
+import { BetaCta } from "./BetaCta";
 
 export function FinalCta() {
   return (
@@ -16,11 +16,11 @@ export function FinalCta() {
           could feel <em>different.</em>
         </h2>
         <p className="lede">
-          We&rsquo;re letting people in a few hundred at a time. Grab a spot —
-          it&rsquo;s free.
+          ZenScail is in open beta and free to start — sign up and get your first
+          morning brief tomorrow.
         </p>
-        <div style={{ marginTop: 32 }}>
-          <Waitlist />
+        <div style={{ marginTop: 32, display: "flex", justifyContent: "center" }}>
+          <BetaCta />
         </div>
       </Reveal>
     </section>

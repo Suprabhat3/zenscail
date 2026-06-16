@@ -1538,3 +1538,43 @@ section[data-screen-label] { position: relative; }
 }
 
 } /* end @layer components (landing styles) */
+
+/* ============================================================
+   Branded loading state (BrandLoader) — unlayered so the
+   dedicated loader animations are never clobbered by utilities.
+   ============================================================ */
+@keyframes zs-halo {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+@keyframes zs-rise {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes zs-msg-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes zs-sweep {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(360%); }
+}
+.zs-halo { animation: zs-halo 3.8s ease-in-out infinite; will-change: transform, opacity; }
+.zs-rise { animation: zs-rise 4.4s ease-in-out infinite; will-change: transform; }
+.zs-msg { animation: zs-msg-in 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.zs-track { position: relative; }
+.zs-track::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: zs-sweep 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .zs-halo, .zs-rise { animation: none; }
+  .zs-track::after { animation: none; opacity: 0.6; }
+}

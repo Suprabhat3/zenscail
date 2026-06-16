@@ -3,12 +3,51 @@
 
 export type AiProvider = "openai" | "anthropic" | "google" | "groq";
 
-export const PROVIDERS: { id: AiProvider; label: string }[] = [
-  { id: "openai", label: "OpenAI" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "google", label: "Google" },
-  { id: "groq", label: "Groq" },
+export type ProviderInfo = {
+  id: AiProvider;
+  label: string;
+  /** Where the user creates/copies an API key for this provider. */
+  keyUrl: string;
+  /** Typical key prefix, shown as the input placeholder so users know it's right. */
+  keyHint: string;
+  /** One-line description for the provider directory. */
+  blurb: string;
+};
+
+export const PROVIDERS: ProviderInfo[] = [
+  {
+    id: "openai",
+    label: "OpenAI",
+    keyUrl: "https://platform.openai.com/api-keys",
+    keyHint: "sk-…",
+    blurb: "GPT-5 family. Great all-round quality.",
+  },
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    keyUrl: "https://console.anthropic.com/settings/keys",
+    keyHint: "sk-ant-…",
+    blurb: "Claude models. Strong writing and reasoning.",
+  },
+  {
+    id: "google",
+    label: "Google Gemini",
+    keyUrl: "https://aistudio.google.com/apikey",
+    keyHint: "AIza…",
+    blurb: "Gemini models. Fast and generous free tier.",
+  },
+  {
+    id: "groq",
+    label: "Groq",
+    keyUrl: "https://console.groq.com/keys",
+    keyHint: "gsk_…",
+    blurb: "Open models at very high speed.",
+  },
 ];
+
+export const PROVIDER_BY_ID: Record<AiProvider, ProviderInfo> = Object.fromEntries(
+  PROVIDERS.map((p) => [p.id, p]),
+) as Record<AiProvider, ProviderInfo>;
 
 export const MODELS: Record<AiProvider, { id: string; label: string; cheap?: boolean }[]> = {
   openai: [
