@@ -64,6 +64,11 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM}
       PUBLIC_WEBHOOK_ORIGIN: ${PUBLIC_WEBHOOK_ORIGIN}
+      # --- Razorpay (ZenScail Cloud subscriptions) ---
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_PLAN_ID: ${RAZORPAY_PLAN_ID}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
     # Host 3003 (3000-3002 are taken by the other front-ends) → container 3000.
     # Bound to localhost so only the host's nginx reverse proxy can reach it.
     ports:
