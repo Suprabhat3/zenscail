@@ -1,12 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import {
   generateDailyBrief,
   setBriefItemState,
-  type BriefItemState,
 } from "@/lib/ai/brief";
+
+const SetBriefItemStateSchema = z.object({
+  key: z.string().min(1),
+  state: z
+    .object({ status: z.enum(["done", "snoozed"]), until: z.string().optional() })
+    .nullable(),
+});
 
 /**
  * Generate (or regenerate) today's brief for the signed-in user. Used as a
@@ -31,10 +38,12 @@ export async function generateBriefAction(): Promise<{ ok: boolean; error?: stri
  */
 export async function setBriefItemStateAction(
   key: string,
-  state: BriefItemState | null,
+  state: { status: "done" | "snoozed"; until?: string } | null,
 ): Promise<{ ok: boolean }> {
+  const parsed = SetBriefItemStateSchema.safeParse({ key, state });
+  if (!parsed.success) return { ok: false };
   const session = await requireSession();
-  await setBriefItemState(session.user.id, key, state);
+  await setBriefItemState(session.user.id, parsed.data.key, parsed.data.state);
   revalidatePath("/dashboard");
   return { ok: true };
 }

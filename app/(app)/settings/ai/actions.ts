@@ -8,16 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { modelInstance } from "@/lib/ai/registry";
-import { isValidModel, type AiProvider } from "@/lib/ai/models";
-
-const PROVIDER_IDS = ["openai", "anthropic", "google", "groq"] as const;
-
-function parseProvider(value: string): AiProvider {
-  if (!(PROVIDER_IDS as readonly string[]).includes(value)) {
-    throw new Error(`Unknown provider: ${value}`);
-  }
-  return value as AiProvider;
-}
+import { type AiProvider } from "@/lib/ai/models";
+import { providerModelSchema } from "@/lib/validation";
 
 export async function saveAiSettings(formData: FormData) {
   const session = await requireSession();
@@ -42,10 +34,11 @@ export async function saveAiSettings(formData: FormData) {
     redirect("/settings/ai?saved=1");
   }
 
-  const provider = parseProvider(String(formData.get("provider") ?? ""));
-  const model = String(formData.get("model") ?? "");
+  const { provider, model } = providerModelSchema.parse({
+    provider: formData.get("provider"),
+    model: formData.get("model"),
+  });
   const apiKey = String(formData.get("apiKey") ?? "").trim();
-  if (!isValidModel(provider, model)) throw new Error(`Unknown model for ${provider}: ${model}`);
 
   const existing = await prisma.userAiSettings.findUnique({
     where: { userId: session.user.id },

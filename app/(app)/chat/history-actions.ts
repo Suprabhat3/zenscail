@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
@@ -9,6 +10,22 @@ export type StoredMessage = {
   role: "user" | "assistant" | "system";
   parts: unknown;
 };
+
+const StoredMessageSchema = z.object({
+  id: z.string().min(1),
+  role: z.enum(["user", "assistant", "system"]),
+  parts: z.unknown(),
+});
+
+const SaveConversationSchema = z.object({
+  id: z.string().min(1),
+  messages: z.array(StoredMessageSchema).min(1),
+});
+
+const FeedbackSchema = z.object({
+  messageId: z.string().min(1),
+  feedback: z.enum(["up", "down"]).nullable(),
+});
 
 export type ConversationSummary = {
   id: string;
@@ -52,8 +69,9 @@ export async function saveConversation(input: {
   id: string;
   messages: StoredMessage[];
 }): Promise<boolean> {
-  const { id, messages } = input;
-  if (!id || !Array.isArray(messages) || messages.length === 0) return false;
+  const validated = SaveConversationSchema.safeParse(input);
+  if (!validated.success) return false;
+  const { id, messages } = validated.data;
   try {
     const session = await requireSession();
     const userId = session.user.id;
@@ -153,18 +171,19 @@ export async function setMessageFeedback(
   messageId: string,
   feedback: "up" | "down" | null,
 ): Promise<boolean> {
-  if (!messageId) return false;
+  const parsed = FeedbackSchema.safeParse({ messageId, feedback });
+  if (!parsed.success) return false;
   try {
     const session = await requireSession();
     // Scope the update to the caller's own conversations.
     const msg = await prisma.chatMessage.findUnique({
-      where: { id: messageId },
+      where: { id: parsed.data.messageId },
       select: { conversation: { select: { userId: true } } },
     });
     if (!msg || msg.conversation.userId !== session.user.id) return false;
     await prisma.chatMessage.update({
-      where: { id: messageId },
-      data: { feedback },
+      where: { id: parsed.data.messageId },
+      data: { feedback: parsed.data.feedback },
     });
     return true;
   } catch {

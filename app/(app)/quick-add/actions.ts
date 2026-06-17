@@ -46,7 +46,7 @@ async function saveQuickCommand(command: string, summary: string): Promise<void>
  * command + outcome is saved to the same history as the assistant dock.
  */
 export async function runQuickCommand(text: string): Promise<QuickResult> {
-  const trimmed = text.trim();
+  const trimmed = z.string().catch("").parse(text).trim();
   if (!trimmed) return { kind: "chat", text: trimmed };
 
   const session = await requireSession();

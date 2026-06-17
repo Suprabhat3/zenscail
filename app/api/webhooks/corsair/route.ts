@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { corsairTenant } from "@/lib/corsair";
 import { verifyWebhookToken } from "@/lib/webhooks";
@@ -12,6 +13,10 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type Plugin = "gmail" | "googlecalendar";
+
+// Inbound payload shapes vary by provider/plugin, so we only assert it's a JSON
+// object and let the tolerant extractors below narrow what they each need.
+const WebhookPayloadSchema = z.record(z.string(), z.unknown());
 
 /**
  * Inbound Corsair webhook receiver. One endpoint for all tenants and plugins
@@ -36,12 +41,10 @@ export async function POST(req: Request) {
   });
   if (!user) return new Response("Unknown tenant", { status: 404 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const parsedBody = WebhookPayloadSchema.safeParse(
+    await req.json().catch(() => ({})),
+  );
+  const body: Record<string, unknown> = parsedBody.success ? parsedBody.data : {};
 
   const { plugin, type } = classifyEvent(body);
 

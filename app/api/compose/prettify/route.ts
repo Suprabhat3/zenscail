@@ -1,8 +1,16 @@
 import { generateText } from "ai";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { getModelForUser } from "@/lib/ai/registry";
+import { parseJsonBody } from "@/lib/validation";
 
 export const maxDuration = 30;
+
+const PrettifyDraftSchema = z.object({
+  body: z.string().optional(),
+  subject: z.string().optional(),
+  to: z.string().optional(),
+});
 
 /**
  * AI "Prettify": turn a plain-text (or lightly-formatted HTML) draft into a
@@ -14,10 +22,8 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const session = await requireSession();
 
-  let payload: { body?: string; subject?: string; to?: string };
-  try {
-    payload = await req.json();
-  } catch {
+  const payload = await parseJsonBody(req, PrettifyDraftSchema);
+  if (!payload) {
     return Response.json({ html: "" }, { status: 400 });
   }
 

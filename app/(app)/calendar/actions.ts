@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
@@ -15,6 +16,36 @@ import {
   type EventReminder,
   type GcalEventTime,
 } from "@/lib/gcal";
+import { formCheckbox, parseFormData } from "@/lib/validation";
+
+/** Scalar fields of the event form. Reminder rows (multi-value) are read
+ *  separately via `formData.getAll`. */
+const EventFormSchema = z.object({
+  summary: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => s.length > 0, "Title and date are required"),
+  date: z.string().min(1, "Title and date are required"), // YYYY-MM-DD
+  startTime: z.string().optional().transform((s) => s ?? ""), // HH:mm, empty = all-day
+  endTime: z.string().optional().transform((s) => s ?? ""),
+  description: z.string().optional().transform((s) => s?.trim() ?? ""),
+  location: z.string().optional().transform((s) => s?.trim() ?? ""),
+  attendees: z.string().optional().transform((s) => s ?? ""),
+  timeZone: z.string().optional().transform((s) => s || undefined),
+  allDay: formCheckbox("on"),
+  recurrence: z.string().optional().transform((s) => s || "none"),
+  visibility: z.string().optional().transform((s) => s || "default"),
+  availability: z.string().optional().transform((s) => s || "opaque"),
+  colorId: z.string().optional().transform((s) => s?.trim() ?? ""),
+  addMeet: formCheckbox("on"),
+  hasMeet: formCheckbox("yes"),
+  useDefaultReminders: formCheckbox("on"),
+  guestsCanInviteOthers: formCheckbox("on"),
+  guestsCanModify: formCheckbox("on"),
+  guestsCanSeeOtherGuests: formCheckbox("on"),
+});
+
+const EventIdSchema = z.object({ id: z.string().min(1, "Missing event id") });
 
 const RECURRENCE_RULES: Record<string, string> = {
   DAILY: "RRULE:FREQ=DAILY",
@@ -42,27 +73,27 @@ export async function refreshCalendar() {
 }
 
 function eventFromForm(formData: FormData): EventInput {
-  const summary = String(formData.get("summary") ?? "").trim();
-  const date = String(formData.get("date") ?? ""); // YYYY-MM-DD
-  const startTime = String(formData.get("startTime") ?? ""); // HH:mm, empty = all-day
-  const endTime = String(formData.get("endTime") ?? "");
-  const description = String(formData.get("description") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
-  const attendeesRaw = String(formData.get("attendees") ?? "");
-  const timeZone = String(formData.get("timeZone") ?? "") || undefined;
-  const allDay = formData.get("allDay") === "on";
-  const recurrence = String(formData.get("recurrence") ?? "none");
-  const visibility = String(formData.get("visibility") ?? "default");
-  const availability = String(formData.get("availability") ?? "opaque");
-  const colorId = String(formData.get("colorId") ?? "").trim();
-  const addMeet = formData.get("addMeet") === "on";
-  const hasExistingMeet = formData.get("hasMeet") === "yes";
-  const useDefaultReminders = formData.get("useDefaultReminders") === "on";
-  const guestsCanInviteOthers = formData.get("guestsCanInviteOthers") === "on";
-  const guestsCanModify = formData.get("guestsCanModify") === "on";
-  const guestsCanSeeOtherGuests = formData.get("guestsCanSeeOtherGuests") === "on";
-
-  if (!summary || !date) throw new Error("Title and date are required");
+  const {
+    summary,
+    date,
+    startTime,
+    endTime,
+    description,
+    location,
+    attendees: attendeesRaw,
+    timeZone,
+    allDay,
+    recurrence,
+    visibility,
+    availability,
+    colorId,
+    addMeet,
+    hasMeet: hasExistingMeet,
+    useDefaultReminders,
+    guestsCanInviteOthers,
+    guestsCanModify,
+    guestsCanSeeOtherGuests,
+  } = parseFormData(formData, EventFormSchema);
 
   // Custom reminder rows (parallel method/minutes arrays from the form).
   const methods = formData.getAll("reminderMethod").map((v) => String(v));
@@ -154,8 +185,7 @@ export async function createEventAction(formData: FormData) {
 
 export async function updateEventAction(formData: FormData) {
   const t = await tenantForCurrentUser();
-  const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Missing event id");
+  const { id } = EventIdSchema.parse(Object.fromEntries(formData.entries()));
   const result = await updateEvent(t, id, eventFromForm(formData));
   if (!result.success) redirect("/connect");
   await refreshEvents(t);
@@ -165,9 +195,9 @@ export async function updateEventAction(formData: FormData) {
 
 export async function deleteEventAction(formData: FormData) {
   const t = await tenantForCurrentUser();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-  const result = await deleteEvent(t, id);
+  const parsed = EventIdSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const result = await deleteEvent(t, parsed.data.id);
   if (!result.success) redirect("/connect");
   await refreshEvents(t);
   revalidatePath("/calendar");

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
@@ -10,16 +11,57 @@ import { modifyThread } from "@/lib/gmail";
 import { deliverScheduledSend } from "@/lib/scheduledSend";
 import { wakeDueSnoozes } from "@/lib/snooze";
 import { publish } from "@/lib/realtime";
+import { clampedInt } from "@/lib/validation";
+
+/** A future instant parsed from an ISO string — rejects invalid or past times. */
+const futureDate = (message: string) =>
+  z.coerce.date().refine((d) => d.getTime() > Date.now(), { error: message });
+
+/** A scheduled-send row id (positive integer). */
+const rowIdSchema = z.coerce.number().int().positive();
+
+const SnoozeSchema = z.object({
+  threadId: z.string().min(1, "threadId required"),
+  until: futureDate("Snooze time must be in the future"),
+});
+
+const SendPayloadSchema = z.object({
+  to: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => s.length > 0, "Recipient is required"),
+  cc: z
+    .string()
+    .optional()
+    .transform((s) => s?.trim() || undefined),
+  subject: z
+    .string()
+    .optional()
+    .transform((s) => s?.trim() ?? ""),
+  // Kept verbatim (not trimmed) but must contain non-whitespace.
+  body: z.string().refine((s) => s.trim().length > 0, "Message body is required"),
+  isHtml: z
+    .boolean()
+    .optional()
+    .transform((v) => Boolean(v)),
+  threadId: z
+    .string()
+    .optional()
+    .transform((s) => s?.trim() || undefined),
+  inReplyTo: z
+    .string()
+    .optional()
+    .transform((s) => s?.trim() || undefined),
+});
+
+/** The shape callers hand us (pre-validation). */
+type SendPayload = z.input<typeof SendPayloadSchema>;
 
 // --- Snooze ---
 
 /** Remove a thread from the inbox until `untilIso`; the wake cron restores it. */
 export async function snoozeThread(threadId: string, untilIso: string) {
-  if (!threadId) throw new Error("threadId required");
-  const until = new Date(untilIso);
-  if (Number.isNaN(until.getTime()) || until.getTime() <= Date.now()) {
-    throw new Error("Snooze time must be in the future");
-  }
+  const { until } = SnoozeSchema.parse({ threadId, until: untilIso });
 
   const session = await requireSession();
   const userId = session.user.id;
@@ -55,32 +97,6 @@ export async function unsnoozeThread(threadId: string) {
 
 // --- Scheduled / deferred send ---
 
-type SendPayload = {
-  to: string;
-  cc?: string;
-  subject: string;
-  body: string;
-  isHtml?: boolean;
-  threadId?: string;
-  inReplyTo?: string;
-};
-
-function validate(p: SendPayload): SendPayload {
-  const to = p.to?.trim();
-  const body = p.body ?? "";
-  if (!to) throw new Error("Recipient is required");
-  if (!body.trim()) throw new Error("Message body is required");
-  return {
-    to,
-    cc: p.cc?.trim() || undefined,
-    subject: p.subject?.trim() ?? "",
-    body,
-    isHtml: Boolean(p.isHtml),
-    threadId: p.threadId?.trim() || undefined,
-    inReplyTo: p.inReplyTo?.trim() || undefined,
-  };
-}
-
 async function currentUserId(): Promise<string> {
   const session = await requireSession();
   // Ensure the tenant exists up front so delivery never races provisioning.
@@ -97,9 +113,9 @@ export async function deferSend(
   payload: SendPayload,
   windowSecs: number,
 ): Promise<{ id: number }> {
-  const data = validate(payload);
+  const data = SendPayloadSchema.parse(payload);
   const userId = await currentUserId();
-  const secs = Math.max(0, Math.min(120, Math.round(windowSecs)));
+  const secs = clampedInt(0, 0, 120).parse(windowSecs);
   const row = await prisma.scheduledSend.create({
     data: {
       userId,
@@ -123,11 +139,8 @@ export async function scheduleSend(
   payload: SendPayload,
   sendAtIso: string,
 ): Promise<{ id: number }> {
-  const data = validate(payload);
-  const sendAt = new Date(sendAtIso);
-  if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() <= Date.now()) {
-    throw new Error("Scheduled time must be in the future");
-  }
+  const data = SendPayloadSchema.parse(payload);
+  const sendAt = futureDate("Scheduled time must be in the future").parse(sendAtIso);
   const userId = await currentUserId();
   const row = await prisma.scheduledSend.create({
     data: {
@@ -150,10 +163,11 @@ export async function scheduleSend(
 
 /** Cancel a pending send (Undo, or the outbox Cancel button). */
 export async function cancelScheduledSend(id: number): Promise<{ canceled: boolean }> {
+  const rowId = rowIdSchema.parse(id);
   const session = await requireSession();
   // Guard on pending + ownership so we can't cancel an already-sent mail.
   const res = await prisma.scheduledSend.updateMany({
-    where: { id, userId: session.user.id, status: "pending" },
+    where: { id: rowId, userId: session.user.id, status: "pending" },
     data: { status: "canceled" },
   });
   revalidatePath("/mail");
@@ -163,13 +177,14 @@ export async function cancelScheduledSend(id: number): Promise<{ canceled: boole
 /** Flush one pending send immediately (called by the client when the undo
  * window elapses, so we don't wait for the coarse cron). Ownership-checked. */
 export async function flushScheduledSend(id: number): Promise<void> {
+  const rowId = rowIdSchema.parse(id);
   const session = await requireSession();
   const row = await prisma.scheduledSend.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id: rowId, userId: session.user.id },
     select: { id: true },
   });
   if (!row) return;
-  await deliverScheduledSend(id);
+  await deliverScheduledSend(rowId);
   revalidatePath("/mail");
 }
 

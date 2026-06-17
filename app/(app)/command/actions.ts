@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
@@ -16,7 +17,7 @@ export type CommandSearchResult = Pick<
  * than redirecting (the palette is an overlay, not a page).
  */
 export async function searchInbox(query: string): Promise<CommandSearchResult[]> {
-  const q = query.trim();
+  const q = z.string().catch("").parse(query).trim();
   if (q.length < 2) return [];
 
   const session = await requireSession();

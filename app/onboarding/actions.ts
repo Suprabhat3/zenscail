@@ -1,10 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret } from "@/lib/crypto";
-import { isValidModel, type AiProvider } from "@/lib/ai/models";
 import {
   createSubscription,
   verifyCheckoutSignature,
@@ -15,15 +15,13 @@ import {
 import { isActiveStatus } from "@/lib/subscription";
 import { CLOUD_PLAN } from "@/lib/plan";
 import { sendCloudReceiptEmail } from "@/lib/email/send";
+import { providerModelSchema } from "@/lib/validation";
 
-const PROVIDER_IDS = ["openai", "anthropic", "google", "groq"] as const;
-
-function parseProvider(value: string): AiProvider {
-  if (!(PROVIDER_IDS as readonly string[]).includes(value)) {
-    throw new Error(`Unknown provider: ${value}`);
-  }
-  return value as AiProvider;
-}
+const CheckoutResultSchema = z.object({
+  paymentId: z.string().min(1),
+  subscriptionId: z.string().min(1),
+  signature: z.string().min(1),
+});
 
 /**
  * Finish onboarding on the BYOK path: save the encrypted key and mark the user
@@ -33,11 +31,12 @@ function parseProvider(value: string): AiProvider {
 export async function finishByok(formData: FormData) {
   const session = await requireSession();
 
-  const provider = parseProvider(String(formData.get("provider") ?? ""));
-  const model = String(formData.get("model") ?? "");
+  const { provider, model } = providerModelSchema.parse({
+    provider: formData.get("provider"),
+    model: formData.get("model"),
+  });
   const apiKey = String(formData.get("apiKey") ?? "").trim();
 
-  if (!isValidModel(provider, model)) throw new Error(`Unknown model for ${provider}: ${model}`);
   if (!apiKey) redirect("/onboarding?step=ai&error=key");
 
   await prisma.userAiSettings.upsert({
@@ -129,16 +128,17 @@ export async function verifyCloudSubscription(args: {
   subscriptionId: string;
   signature: string;
 }): Promise<{ ok: boolean }> {
+  const checkout = CheckoutResultSchema.parse(args);
   const session = await requireSession();
 
-  const signatureOk = verifyCheckoutSignature(args);
+  const signatureOk = verifyCheckoutSignature(checkout);
   if (!signatureOk) return { ok: false };
 
   // Confirm against Razorpay (don't trust the client's word on status).
   let status = "active";
   let currentEnd: Date | null = null;
   try {
-    const remote = await fetchSubscription(args.subscriptionId);
+    const remote = await fetchSubscription(checkout.subscriptionId);
     status = remote.status;
     currentEnd = remote.current_end ? new Date(remote.current_end * 1000) : null;
   } catch {
@@ -151,7 +151,7 @@ export async function verifyCloudSubscription(args: {
     where: { userId: session.user.id },
     select: { razorpaySubscriptionId: true },
   });
-  if (existing && existing.razorpaySubscriptionId !== args.subscriptionId) {
+  if (existing && existing.razorpaySubscriptionId !== checkout.subscriptionId) {
     return { ok: false };
   }
 
@@ -159,7 +159,7 @@ export async function verifyCloudSubscription(args: {
     where: { userId: session.user.id },
     create: {
       userId: session.user.id,
-      razorpaySubscriptionId: args.subscriptionId,
+      razorpaySubscriptionId: checkout.subscriptionId,
       status,
       currentEnd,
     },

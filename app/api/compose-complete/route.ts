@@ -1,8 +1,16 @@
 import { generateText } from "ai";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { getModelForUser } from "@/lib/ai/registry";
+import { parseJsonBody } from "@/lib/validation";
 
 export const maxDuration = 15;
+
+const ComposeDraftSchema = z.object({
+  subject: z.string().optional(),
+  to: z.string().optional(),
+  body: z.string().optional(),
+});
 
 /**
  * Smart-compose autocomplete: given the current draft, return a short
@@ -13,10 +21,8 @@ export const maxDuration = 15;
 export async function POST(req: Request) {
   const session = await requireSession();
 
-  let payload: { subject?: string; to?: string; body?: string };
-  try {
-    payload = await req.json();
-  } catch {
+  const payload = await parseJsonBody(req, ComposeDraftSchema);
+  if (!payload) {
     return Response.json({ completion: "" });
   }
 

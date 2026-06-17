@@ -1,8 +1,30 @@
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+const RazorpayEventSchema = z.object({
+  event: z.string().optional(),
+  payload: z
+    .object({
+      subscription: z
+        .object({
+          entity: z
+            .object({
+              id: z.string().optional(),
+              status: z.string().optional(),
+              current_end: z.number().nullish(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+type RazorpayEvent = z.infer<typeof RazorpayEventSchema>;
 
 /**
  * Razorpay subscription webhook. Keeps our Subscription rows in sync with the
@@ -21,7 +43,7 @@ export async function POST(req: Request) {
 
   let event: RazorpayEvent;
   try {
-    event = JSON.parse(raw) as RazorpayEvent;
+    event = RazorpayEventSchema.parse(JSON.parse(raw));
   } catch {
     return new Response("Bad payload", { status: 400 });
   }
@@ -49,16 +71,3 @@ export async function POST(req: Request) {
 
   return Response.json({ ok: true });
 }
-
-type RazorpayEvent = {
-  event?: string;
-  payload?: {
-    subscription?: {
-      entity?: {
-        id?: string;
-        status?: string;
-        current_end?: number | null;
-      };
-    };
-  };
-};

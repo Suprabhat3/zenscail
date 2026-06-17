@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
@@ -17,6 +18,28 @@ import {
   dropCachedThread,
   markMessagesReadInCache,
 } from "@/lib/mailCache";
+import { parseFormData } from "@/lib/validation";
+
+/** Optional form text: an empty/absent field becomes `undefined`, never `""`. */
+const optionalText = z
+  .string()
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
+const SendMessageSchema = z.object({
+  to: z.string().trim().min(1, "Recipient and body are required"),
+  subject: z.string().trim().default(""),
+  body: z.string().min(1, "Recipient and body are required"),
+  threadId: optionalText,
+  inReplyTo: optionalText,
+});
+
+const MessageIdSchema = z.object({ id: z.string().min(1) });
+
+const BundleSchema = z.object({
+  ids: z.array(z.string()),
+  op: z.enum(["read", "archive"]),
+});
 
 async function sessionAndTenant() {
   const session = await requireSession();
@@ -37,12 +60,10 @@ export async function refreshInbox() {
 
 export async function sendMessage(formData: FormData) {
   const { userId, t } = await sessionAndTenant();
-  const to = String(formData.get("to") ?? "").trim();
-  const subject = String(formData.get("subject") ?? "").trim();
-  const text = String(formData.get("body") ?? "");
-  const threadId = String(formData.get("threadId") ?? "") || undefined;
-  const inReplyTo = String(formData.get("inReplyTo") ?? "") || undefined;
-  if (!to || !text) throw new Error("Recipient and body are required");
+  const { to, subject, body: text, threadId, inReplyTo } = parseFormData(
+    formData,
+    SendMessageSchema,
+  );
 
   const result = await sendEmail(t, {
     to,
@@ -62,8 +83,9 @@ export async function sendMessage(formData: FormData) {
 
 export async function trashMessageAction(formData: FormData) {
   const { userId, t } = await sessionAndTenant();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  const parsed = MessageIdSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const { id } = parsed.data;
   const result = await trashMessage(t, id);
   if (!result.success) redirect("/connect");
   await dropCachedMessage(userId, id);
@@ -72,8 +94,9 @@ export async function trashMessageAction(formData: FormData) {
 
 export async function archiveMessageAction(formData: FormData) {
   const { userId, t } = await sessionAndTenant();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  const parsed = MessageIdSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const { id } = parsed.data;
   const result = await modifyMessage(t, id, { removeLabelIds: ["INBOX"] });
   if (!result.success) redirect("/connect");
   // Archived = no longer in INBOX; drop it so it leaves the cached inbox list.
@@ -83,8 +106,9 @@ export async function archiveMessageAction(formData: FormData) {
 
 export async function markReadAction(formData: FormData) {
   const { userId, t } = await sessionAndTenant();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  const parsed = MessageIdSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const { id } = parsed.data;
   await modifyMessage(t, id, { removeLabelIds: ["UNREAD"] });
   await markMessagesReadInCache(userId, [id]);
   revalidatePath("/mail");
@@ -92,11 +116,12 @@ export async function markReadAction(formData: FormData) {
 
 /** Batch action over a bundle: mark every message read or archive them all. */
 export async function bundleAction(ids: string[], op: "read" | "archive") {
-  const clean = ids.filter(Boolean);
+  const parsed = BundleSchema.parse({ ids, op });
+  const clean = parsed.ids.filter(Boolean);
   if (clean.length === 0) return { ok: true };
   const { userId, t } = await sessionAndTenant();
   const mods =
-    op === "archive"
+    parsed.op === "archive"
       ? { removeLabelIds: ["INBOX"] }
       : { removeLabelIds: ["UNREAD"] };
   const results = await Promise.allSettled(
