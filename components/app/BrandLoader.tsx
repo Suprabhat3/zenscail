@@ -36,27 +36,29 @@ export function BrandLoader({ title, messages, fullScreen = false }: BrandLoader
           : "flex min-h-[72vh] flex-col items-center justify-center px-6 text-center text-(--ink)"
       }
     >
-      {/* Logo under a breathing halo */}
+      {/* Logo: a still mark with a faint breath, a soft glow, and a single
+          accent arc quietly orbiting it. */}
       <div className="relative flex h-28 w-28 items-center justify-center">
         <span
           aria-hidden
-          className="zs-halo absolute inset-0 rounded-full"
+          className="zs-halo absolute inset-1 rounded-full"
           style={{
             background:
-              "radial-gradient(circle, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-tint) 60%, transparent) 45%, transparent 72%)",
+              "radial-gradient(circle, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-tint) 55%, transparent) 46%, transparent 70%)",
           }}
         />
         <span
           aria-hidden
-          className="absolute inset-5 rounded-full border border-(--accent)/15"
+          className="absolute inset-2 rounded-full border border-(--accent)/10"
         />
+        <span aria-hidden className="zs-orbit absolute inset-2 rounded-full" />
         <Image
           src="/logo.png"
           alt="ZenScail"
           width={52}
           height={46}
           priority
-          className="zs-rise relative"
+          className="zs-breathe relative"
         />
       </div>
 

@@ -68,6 +68,8 @@ export function CloudPlanCta() {
   }
 
   if (status?.isActive) {
+    // Rendered inside the dark "featured" Cloud card — use light text so it's
+    // legible against the dark background.
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <span
@@ -77,8 +79,8 @@ export function CloudPlanCta() {
             alignItems: "center",
             gap: 6,
             borderRadius: 999,
-            background: "var(--accent-soft, #FCE9ED)",
-            color: "var(--accent-deep, #B81239)",
+            background: "rgba(225, 29, 72, 0.22)",
+            color: "#FBD3DC",
             padding: "4px 12px",
             fontSize: 12,
             fontWeight: 700,
@@ -87,11 +89,11 @@ export function CloudPlanCta() {
         >
           ✦ Your Cloud plan
         </span>
-        <p style={{ margin: 0, fontSize: 14, color: "#5C5346" }}>
+        <p style={{ margin: 0, fontSize: 14, color: "#C9BEAA" }}>
           {status.cancelAtPeriodEnd ? "Active until " : "Renews on "}
-          <strong style={{ color: "#25201A" }}>{formatDate(status.currentEnd)}</strong>
+          <strong style={{ color: "#FFFDF8" }}>{formatDate(status.currentEnd)}</strong>
         </p>
-        <Link className="btn btn-ghost" href="/settings/billing" style={{ alignSelf: "flex-start" }}>
+        <Link className="btn btn-accent" href="/settings/billing" style={{ alignSelf: "flex-start" }}>
           Manage subscription
         </Link>
       </div>

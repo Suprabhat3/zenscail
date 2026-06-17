@@ -1544,12 +1544,15 @@ section[data-screen-label] { position: relative; }
    dedicated loader animations are never clobbered by utilities.
    ============================================================ */
 @keyframes zs-halo {
-  0%, 100% { opacity: 0.55; transform: scale(0.96); }
-  50% { opacity: 1; transform: scale(1.12); }
+  0%, 100% { opacity: 0.5; transform: scale(0.97); }
+  50% { opacity: 0.85; transform: scale(1.06); }
 }
-@keyframes zs-rise {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+@keyframes zs-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes zs-orbit {
+  to { transform: rotate(360deg); }
 }
 @keyframes zs-msg-in {
   from { opacity: 0; transform: translateY(7px); }
@@ -1559,8 +1562,23 @@ section[data-screen-label] { position: relative; }
   0% { transform: translateX(-110%); }
   100% { transform: translateX(360%); }
 }
-.zs-halo { animation: zs-halo 3.8s ease-in-out infinite; will-change: transform, opacity; }
-.zs-rise { animation: zs-rise 4.4s ease-in-out infinite; will-change: transform; }
+.zs-halo { animation: zs-halo 4.6s ease-in-out infinite; will-change: transform, opacity; }
+.zs-breathe { animation: zs-breathe 4.6s ease-in-out infinite; will-change: transform; }
+/* A single soft accent arc that quietly orbits the mark. */
+.zs-orbit {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 232deg,
+    color-mix(in srgb, var(--accent) 70%, transparent) 320deg,
+    var(--accent) 356deg,
+    transparent 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+  animation: zs-orbit 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+}
 .zs-msg { animation: zs-msg-in 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .zs-track { position: relative; }
 .zs-track::after {
@@ -1575,6 +1593,7 @@ section[data-screen-label] { position: relative; }
   animation: zs-sweep 1.6s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .zs-halo, .zs-rise { animation: none; }
+  .zs-halo, .zs-breathe, .zs-orbit { animation: none; }
+  .zs-orbit { opacity: 0.5; }
   .zs-track::after { animation: none; opacity: 0.6; }
 }
