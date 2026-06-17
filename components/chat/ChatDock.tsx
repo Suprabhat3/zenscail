@@ -16,6 +16,7 @@ import {
   deleteConversation,
   type ConversationSummary,
 } from "@/app/(app)/chat/history-actions";
+import Image from "next/image";
 
 export type ChatModelOption = { id: string; label: string };
 
@@ -315,16 +316,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
         <div className="flex items-center justify-between gap-3 border-b border-(--line-soft) bg-(--bg) px-4 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--accent-soft)">
-              <svg width="16" height="16" viewBox="0 0 30 30" aria-hidden="true">
-                <path
-                  d="M 15 3.5 A 11.5 11.5 0 1 0 26.5 15"
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-                <circle cx="23.5" cy="7.5" r="3.4" fill="var(--accent)" />
-              </svg>
+             <Image src="/logo.png" alt="ZenScail" width={32} height={32} />
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-(--ink)">Assistant</p>

@@ -226,8 +226,8 @@ export default function TermsPage() {
         </ul>
         <p>
           If you believe you were charged in error or have a billing concern, contact us at{" "}
-          <Mail address="support@zenscail.com " /> and we&rsquo;ll look into it promptly and
-          in good faith.
+          <Mail address="support@zenscail.com" />{" "}and we&rsquo;ll look into it promptly and in good faith.
+     
         </p>
       </section>
 
