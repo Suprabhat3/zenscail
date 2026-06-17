@@ -368,6 +368,7 @@ function eventUrl(input: {
   endIso?: string | null;
   attendees: string;
   description?: string | null;
+  addMeet?: boolean;
 }): string {
   const params = new URLSearchParams();
   if (input.summary) params.set("summary", input.summary);
@@ -379,6 +380,7 @@ function eventUrl(input: {
   if (/^\d{2}:\d{2}$/.test(end)) params.set("endTime", end);
   if (input.attendees) params.set("attendees", input.attendees);
   if (input.description) params.set("description", input.description);
+  if (input.addMeet) params.set("addMeet", "1");
   return `/calendar/new?${params.toString()}`;
 }
 
@@ -439,8 +441,13 @@ function actionTools(userId: string, onDirective?: (d: AgentDirective) => void) 
           .array(z.string())
           .describe("Guest emails or names (names are resolved to addresses). [] if none."),
         description: z.string().nullable().describe("Optional event description / agenda."),
+        addMeet: z
+          .boolean()
+          .describe(
+            "Whether to attach a Google Meet video-conferencing link. Set true when the user mentions Google Meet, a video/online/virtual call, or a remote meeting. Default false for in-person or unspecified events.",
+          ),
       }),
-      execute: async ({ summary, startIso, endIso, attendees, description }) => {
+      execute: async ({ summary, startIso, endIso, attendees, description, addMeet }) => {
         const resolved = await Promise.all(
           (attendees ?? []).map((a) => resolveRecipient(userId, a)),
         );
@@ -452,6 +459,7 @@ function actionTools(userId: string, onDirective?: (d: AgentDirective) => void) 
             endIso,
             attendees: resolved.filter(Boolean).join(", "),
             description,
+            addMeet,
           }),
           label: `Schedule “${summary}”`,
           summary,

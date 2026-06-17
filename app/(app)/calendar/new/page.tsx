@@ -26,9 +26,11 @@ export default async function NewEventPage({
     startTime?: string;
     endTime?: string;
     attendees?: string;
+    addMeet?: string;
   }>;
 }) {
-  const { date, summary, description, startTime, endTime, attendees } = await searchParams;
+  const { date, summary, description, startTime, endTime, attendees, addMeet } =
+    await searchParams;
   const session = await requireSession();
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
@@ -75,7 +77,15 @@ export default async function NewEventPage({
       <div className="mt-6 rounded-3xl border border-(--line-soft) bg-(--paper) p-6 shadow-(--shadow-card)">
         <EventForm
           action={createEventAction}
-          defaults={{ date, summary, description, startTime, endTime, attendees }}
+          defaults={{
+            date,
+            summary,
+            description,
+            startTime,
+            endTime,
+            attendees,
+            addMeet: addMeet === "1",
+          }}
           submitLabel="Create event"
         />
       </div>

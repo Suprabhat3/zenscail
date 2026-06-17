@@ -74,6 +74,7 @@ export function EventForm({
     startTime?: string;
     endTime?: string;
     attendees?: string;
+    addMeet?: boolean;
   };
   submitLabel: string;
 }) {
@@ -254,7 +255,12 @@ export function EventForm({
           </a>
         ) : (
           <label className="mt-1.5 flex cursor-pointer items-center gap-2 rounded-2xl border border-(--line) bg-(--bg) px-3.5 py-2.5 text-sm text-(--ink-soft)">
-            <input type="checkbox" name="addMeet" className="h-4 w-4 accent-(--accent)" />
+            <input
+              type="checkbox"
+              name="addMeet"
+              defaultChecked={defaults?.addMeet}
+              className="h-4 w-4 accent-(--accent)"
+            />
             Add Google Meet video conferencing
           </label>
         )}

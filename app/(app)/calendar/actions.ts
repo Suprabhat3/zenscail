@@ -173,6 +173,36 @@ function eventFromForm(formData: FormData): EventInput {
   };
 }
 
+/**
+ * One-click "Meet now": creates a 30-minute calendar event starting now with a
+ * Google Meet link attached, then drops the user on the event page where the
+ * join link is shown. Unlike the AI assistant (review-first), this is a direct
+ * user action, so it creates immediately.
+ */
+export async function createInstantMeet() {
+  const t = await tenantForCurrentUser();
+  const now = new Date();
+  const end = new Date(now.getTime() + 30 * 60_000);
+  const event: EventInput = {
+    summary: "Instant meeting",
+    start: { dateTime: now.toISOString() },
+    end: { dateTime: end.toISOString() },
+    reminders: { useDefault: true },
+    conferenceData: {
+      createRequest: {
+        requestId: randomUUID(),
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    },
+  };
+  const result = await createEvent(t, event);
+  if (!result.success) redirect("/connect");
+  await refreshEvents(t);
+  revalidatePath("/calendar");
+  const id = result.data?.id;
+  redirect(id ? `/calendar/event/${encodeURIComponent(id)}` : "/calendar");
+}
+
 export async function createEventAction(formData: FormData) {
   const t = await tenantForCurrentUser();
   const result = await createEvent(t, eventFromForm(formData));
