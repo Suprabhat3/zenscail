@@ -1,7 +1,13 @@
 import "server-only";
 
 import { Resend } from "resend";
-import { verificationEmail, onboardingEmail } from "./render";
+import { prisma } from "@/lib/prisma";
+import {
+  verificationEmail,
+  onboardingEmail,
+  cloudReceiptEmail,
+  activatedEmail,
+} from "./render";
 
 /**
  * Lazy Resend client (like lib/corsair.ts) so builds/CI without a key don't
@@ -64,4 +70,51 @@ export async function sendOnboardingEmail(opts: {
 }): Promise<void> {
   const { subject, html, text } = onboardingEmail({ name: opts.name });
   await deliver({ to: opts.to, subject, html, text });
+}
+
+export async function sendCloudReceiptEmail(opts: {
+  to: string;
+  name?: string;
+  amount: number;
+  currency: string;
+  interval: "month" | "year";
+  renewsOn?: Date | null;
+}): Promise<void> {
+  const { subject, html, text } = cloudReceiptEmail(opts);
+  await deliver({ to: opts.to, subject, html, text });
+}
+
+export async function sendActivatedEmail(opts: {
+  to: string;
+  name?: string;
+}): Promise<void> {
+  const { subject, html, text } = activatedEmail({ name: opts.name });
+  await deliver({ to: opts.to, subject, html, text });
+}
+
+/**
+ * Send the "last email you'll read manually" finale exactly once per user.
+ * Guarded by `User.activatedAt` (set before sending) so repeat dashboard loads
+ * never duplicate it. Best-effort: a mail failure never breaks the page.
+ * Call from the dashboard on first load, after onboarding is complete.
+ */
+export async function sendActivatedOnce(user: {
+  id: string;
+  email: string;
+  name?: string | null;
+}): Promise<void> {
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { activatedAt: true },
+    });
+    if (row?.activatedAt) return;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { activatedAt: new Date() },
+    });
+    await sendActivatedEmail({ to: user.email, name: user.name ?? undefined });
+  } catch (err) {
+    console.warn("Activated email skipped:", err);
+  }
 }

@@ -19,6 +19,9 @@ model User {
   connectedEmail  String?         @map("connected_email")
   // Set once the welcome/onboarding email has been sent, so it's never duplicated.
   welcomedAt      DateTime?       @map("welcomed_at")
+  // Set once the "last email you'll read manually" finale has been sent, on the
+  // first dashboard load after setup is complete. Guards against duplicates.
+  activatedAt     DateTime?       @map("activated_at")
   // Set when the user finishes the first-run onboarding wizard (connect + AI choice).
   // Used to gate /onboarding; existing connected users are treated as onboarded.
   onboardedAt     DateTime?       @map("onboarded_at")

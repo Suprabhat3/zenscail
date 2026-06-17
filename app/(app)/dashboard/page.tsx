@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
+import { sendActivatedOnce } from "@/lib/email/send";
 import { getTodayBrief, type BriefEvent } from "@/lib/ai/brief";
 import { Markdown } from "@/components/chat/Markdown";
 import { GenerateBrief } from "@/components/dashboard/GenerateBrief";
@@ -74,6 +75,16 @@ function TodayTimeline({ events }: { events: BriefEvent[] }) {
 
 export default async function DashboardPage() {
   const session = await requireSession();
+
+  // First time a fully-onboarded user reaches the dashboard, send the
+  // "last email you'll read manually" finale. Guarded once-only and fired
+  // without awaiting so it never delays the page render.
+  void sendActivatedOnce({
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+  });
+
   const brief = await getTodayBrief(session.user.id);
   const firstName = session.user.name?.split(" ")[0] || "there";
   const today = new Date().toLocaleDateString("en-US", {

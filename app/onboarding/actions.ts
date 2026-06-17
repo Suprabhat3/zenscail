@@ -13,6 +13,8 @@ import {
   razorpayKeyId,
 } from "@/lib/razorpay";
 import { isActiveStatus } from "@/lib/subscription";
+import { CLOUD_PLAN } from "@/lib/plan";
+import { sendCloudReceiptEmail } from "@/lib/email/send";
 
 const PROVIDER_IDS = ["openai", "anthropic", "google", "groq"] as const;
 
@@ -151,6 +153,20 @@ export async function verifyCloudSubscription(args: {
       where: { id: session.user.id },
       data: { onboardedAt: new Date() },
     });
+
+    // Payment receipt — best-effort; never block Cloud access on a mail hiccup.
+    try {
+      await sendCloudReceiptEmail({
+        to: session.user.email,
+        name: session.user.name ?? undefined,
+        amount: CLOUD_PLAN.price,
+        currency: CLOUD_PLAN.currency,
+        interval: CLOUD_PLAN.interval,
+        renewsOn: currentEnd,
+      });
+    } catch (err) {
+      console.warn("Cloud receipt email skipped:", err);
+    }
   }
 
   return { ok: isActiveStatus(status) };
