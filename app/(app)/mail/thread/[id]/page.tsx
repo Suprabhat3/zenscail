@@ -19,7 +19,9 @@ import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
 import { SendBar } from "@/components/mail/SendBar";
 import { ReplyChips } from "@/components/mail/ReplyChips";
 import { FollowUpButton } from "@/components/mail/FollowUpButton";
+import { SummaryBanner } from "@/components/mail/SummaryBanner";
 import { getFollowUp } from "@/lib/followUp";
+import { getEmailSummaryFor } from "@/lib/ai/summary";
 
 export const metadata = { title: "Thread — ZenScail" };
 
@@ -156,6 +158,13 @@ export default async function ThreadPage({
     header(last?.payload, "Reply-To") ||
     (isFromMe(lastFrom, identity) ? header(last?.payload, "To") : lastFrom);
 
+  // Reuse the summary already generated for the inbox hover card (keyed by the
+  // latest message's gmail id). Best-effort & cached — generates on first open
+  // only if it wasn't pre-generated on arrival.
+  const summary = last?.id
+    ? await getEmailSummaryFor(session.user.id, t, last.id)
+    : null;
+
   const participants = Array.from(
     new Set(messages.map((m) => parseSender(header(m.payload, "From")).name).filter(Boolean)),
   );
@@ -207,6 +216,13 @@ export default async function ThreadPage({
           Create event
         </Link>
       </div>
+
+      {/* At-a-glance AI summary (reuses the inbox hover summary) */}
+      {summary && (
+        <div className="mt-5">
+          <SummaryBanner data={summary} />
+        </div>
+      )}
 
       {/* Messages — older ones collapsed, latest expanded */}
       <div className="mt-6 space-y-3">
