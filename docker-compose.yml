@@ -1,0 +1,93 @@
+# Production deployment for a single VPS: Next.js app + Postgres co-located.
+# Bring the stack up with:  docker compose up -d --build
+# Secrets are read from a local `.env` file (see `.env.docker.example`).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zenscail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-zenscail}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not published to the host — only the app talks to it over the
+    # internal compose network. Expose a port here only for debugging.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zenscail} -d ${POSTGRES_DB:-zenscail}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # One-shot schema sync. Uses the `builder` stage (full source + working
+  # Prisma CLI) to run `prisma db push`, then exits. The app waits for this to
+  # complete successfully before booting. (No migration files; `db push` is the
+  # project's flow.) prisma.config.ts reads DATABASE_URL from the env below.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zenscail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-zenscail}?sslmode=disable
+    command: ["pnpm", "exec", "prisma", "db", "push"]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # App reaches Postgres by its service name on the compose network.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zenscail}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-zenscail}?sslmode=disable
+      NODE_ENV: production
+      # --- App secrets / config (pulled from .env) ---
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?required}
+      APP_SECRET: ${APP_SECRET}
+      CORSAIR_DEV_KEY: ${CORSAIR_DEV_KEY}
+      CORSAIR_INSTANCE_ID: ${CORSAIR_INSTANCE_ID}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      PUBLIC_WEBHOOK_ORIGIN: ${PUBLIC_WEBHOOK_ORIGIN}
+      # --- Razorpay (ZenScail Cloud subscriptions) ---
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_PLAN_ID: ${RAZORPAY_PLAN_ID}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+    # Host 3003 (3000-3002 are taken by the other front-ends) → container 3000.
+    # Bound to localhost so only the host's nginx reverse proxy can reach it.
+    ports:
+      - "127.0.0.1:3003:3000"
+    # Standalone server. Schema sync already ran in the `migrate` service.
+    command: ["node", "server.js"]
+
+  # Replaces Vercel Cron: triggers the app's /api/cron/* endpoints on a
+  # schedule (see docker/crontab). Talks to `app` over the internal network.
+  cron:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cron
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      CRON_SECRET: ${CRON_SECRET:?required}
+
+volumes:
+  pgdata:

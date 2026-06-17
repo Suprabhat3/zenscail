@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 export type WaitlistState = {
@@ -8,19 +9,24 @@ export type WaitlistState = {
   message?: string;
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Slightly stricter than the shared email regex: requires a 2+ char TLD.
+const WaitlistSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/),
+});
 
 export async function joinWaitlist(
   _prev: WaitlistState,
   formData: FormData
 ): Promise<WaitlistState> {
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-
-  if (!EMAIL_RE.test(email)) {
+  const parsed = WaitlistSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
     return { status: "error", message: "Please enter a valid email address." };
   }
+  const { email } = parsed.data;
 
   try {
     const existing = await prisma.waitlist.findUnique({ where: { email } });

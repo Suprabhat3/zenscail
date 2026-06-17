@@ -7,6 +7,352 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id              String          @id
+  name            String
+  email           String          @unique
+  emailVerified   Boolean         @default(false)
+  image           String?
+  corsairTenantId String?         @map("corsair_tenant_id")
+  // The Gmail address actually connected via Corsair — may differ from `email`
+  // (the app-login identity). This is the real mailbox the user is reading.
+  connectedEmail  String?         @map("connected_email")
+  // Set once the welcome/onboarding email has been sent, so it's never duplicated.
+  welcomedAt      DateTime?       @map("welcomed_at")
+  // Set once the "last email you'll read manually" finale has been sent, on the
+  // first dashboard load after setup is complete. Guards against duplicates.
+  activatedAt     DateTime?       @map("activated_at")
+  // Set when the user finishes the first-run onboarding wizard (connect + AI choice).
+  // Used to gate /onboarding; existing connected users are treated as onboarded.
+  onboardedAt     DateTime?       @map("onboarded_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  sessions        Session[]
+  accounts        Account[]
+  aiSettings      UserAiSettings?
+  subscription    Subscription?
+
+  @@map("user")
+}
+
+model Subscription {
+  id                     Int       @id @default(autoincrement())
+  userId                 String    @unique @map("user_id")
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The Razorpay subscription id (sub_xxx) this row tracks.
+  razorpaySubscriptionId String    @unique @map("razorpay_subscription_id")
+  // The Razorpay plan id it was created against (plan_xxx).
+  razorpayPlanId         String?   @map("razorpay_plan_id")
+  // Mirrors Razorpay's subscription status, kept in sync by the webhook:
+  // "created" | "authenticated" | "active" | "pending" | "halted" |
+  // "cancelled" | "completed" | "expired". Cloud access requires "active".
+  status                 String    @default("created")
+  // End of the current paid period (epoch seconds from Razorpay → DateTime),
+  // so we can show renewal date and grace-handle near expiry.
+  currentEnd             DateTime? @map("current_end")
+  // Set when the user cancels at cycle end: the subscription stays "active"
+  // (and Cloud keeps working) until `currentEnd`, then stops renewing.
+  cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("subscription")
+}
+
+model UserAiSettings {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier            String   @default("cloud") // "cloud" | "byok"
+  provider        String? // "openai" | "anthropic" | "google" (byok only)
+  model           String?
+  encryptedApiKey String?  @map("encrypted_api_key") // AES-256-GCM, see lib/crypto.ts
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("user_ai_settings")
+}
+
+model EmailMeta {
+  id             Int      @id @default(autoincrement())
+  userId         String   @map("user_id")
+  gmailMessageId String   @map("gmail_message_id")
+  priority       String // "urgent" | "normal" | "low"
+  reason         String?
+  category       String? // "important" | "newsletter" | "social" | "notification" | "other"
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, gmailMessageId])
+  @@index([userId, priority])
+  @@map("email_meta")
+}
+
+model EmailSummary {
+  id             Int      @id @default(autoincrement())
+  userId         String   @map("user_id")
+  gmailMessageId String   @map("gmail_message_id")
+  // One-glance summary, generated ONCE (chief model) on arrival and cached here
+  // so hovering an inbox row never re-summarizes the same email.
+  tldr           String
+  bullets        Json // string[] — key points
+  // The single concrete thing the recipient needs to do, or null if none.
+  action         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, gmailMessageId])
+  @@map("email_summary")
+}
+
+/// Local content cache for an inbox row, so the mail list renders without the
+/// per-message gmail.api.messages.get fan-out. Corsair's own cache is
+/// content-less (only id/threadId), so we hydrate once and persist here. New
+/// mail is written by the webhook + the 60s client poll; opening/acting on a
+/// thread keeps `unread`/`labelIds` in sync. `internalDate` is epoch millis.
+model CachedMessage {
+  id                 Int      @id @default(autoincrement())
+  userId             String   @map("user_id")
+  gmailMessageId     String   @map("gmail_message_id")
+  threadId           String   @map("thread_id")
+  fromAddr           String   @map("from_addr")
+  subject            String
+  snippet            String
+  internalDate       BigInt   @map("internal_date")
+  unread             Boolean
+  labelIds           String[] @map("label_ids")
+  hasListUnsubscribe Boolean  @map("has_list_unsubscribe")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, gmailMessageId])
+  @@index([userId, threadId])
+  @@map("cached_message")
+}
+
+/// Local content cache for a full thread (all messages incl. MIME bodies), so
+/// opening a conversation is instant on repeat. `data` is the GmailThread JSON
+/// from gmail.api.threads.get (format=full). Served stale-while-revalidate;
+/// `fetchedAt` drives the background refresh, and replies/sync invalidate it.
+model CachedThread {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  threadId  String   @map("thread_id")
+  data      Json
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@unique([userId, threadId])
+  @@map("cached_thread")
+}
+
+model Conversation {
+  // Client-generated UUID so the dock can persist before the first round-trip.
+  id        String        @id
+  userId    String        @map("user_id")
+  // Derived from the first user message; shown in the history list.
+  title     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  messages  ChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("conversation")
+}
+
+model ChatMessage {
+  // The UIMessage id from the chat client.
+  id             String       @id
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  // Full UIMessage parts (text + tool calls) so a conversation restores exactly.
+  parts          Json
+  // Thumbs up/down on assistant replies: "up" | "down" | null.
+  feedback       String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("chat_message")
+}
+
+model DailyBrief {
+  id          Int      @id @default(autoincrement())
+  userId      String   @map("user_id")
+  date        String // "YYYY-MM-DD" in the user's day (server local)
+  headline    String
+  overview    String // markdown body
+  actionItems Json     @map("action_items") // BriefActionItem[] — see lib/ai/brief.ts
+  events      Json // BriefEvent[] — today's calendar snapshot at generation time
+  stats       Json // { emailsReviewed, urgentCount, meetingsToday }
+  itemStates  Json?    @map("item_states") // Record<itemKey, { status: "done"|"snoozed"; until?: string }> — dashboard interactions
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, date])
+  @@map("daily_brief")
+}
+
+model SnoozedThread {
+  id          Int      @id @default(autoincrement())
+  userId      String   @map("user_id")
+  threadId    String   @map("thread_id")
+  // Captured so the wake cron can re-surface the right conversation; the
+  // thread id is what we re-label INBOX on.
+  snoozeUntil DateTime @map("snooze_until")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // One active snooze per thread per user; re-snoozing upserts.
+  @@unique([userId, threadId])
+  @@index([userId, snoozeUntil])
+  @@map("snoozed_thread")
+}
+
+model ScheduledSend {
+  id        Int       @id @default(autoincrement())
+  userId    String    @map("user_id")
+  to        String
+  cc        String?
+  subject   String
+  body      String
+  // When true, `body` is a full inline-styled HTML document; we send it as the
+  // HTML part of a multipart/alternative message with a stripped text fallback.
+  isHtml    Boolean   @default(false) @map("is_html")
+  threadId  String?   @map("thread_id")
+  inReplyTo String?   @map("in_reply_to")
+  sendAt    DateTime  @map("send_at")
+  // "pending" | "sent" | "failed" | "canceled"
+  status    String    @default("pending")
+  // Set when the send fails, for the outbox UI.
+  error     String?
+  // Distinguishes the short undo-window deferral from a real "send later".
+  isUndo    Boolean   @default(false) @map("is_undo")
+  createdAt DateTime  @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+
+  @@index([userId, status, sendAt])
+  @@index([status, sendAt])
+  @@map("scheduled_send")
+}
+
+model Draft {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  // Compose fields. Empty strings rather than null so a brand-new draft is valid.
+  to        String   @default("")
+  cc        String?
+  subject   String   @default("")
+  body      String   @default("")
+  // When true, `body` is inline-styled HTML (rich composer / AI prettify); the
+  // composer reloads it into the rich editor and sends it as HTML.
+  isHtml    Boolean  @default(false) @map("is_html")
+  // Set when the draft is a reply, so reopening keeps it threaded.
+  threadId  String?  @map("thread_id")
+  inReplyTo String?  @map("in_reply_to")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt])
+  @@map("draft")
+}
+
+model FollowUp {
+  id                 Int       @id @default(autoincrement())
+  userId             String    @map("user_id")
+  // The thread we're waiting on a reply in. One active follow-up per thread.
+  threadId           String    @map("thread_id")
+  // Gmail message id of the latest message at the time the reminder was set;
+  // the cron compares against it to decide whether a newer inbound reply landed.
+  lastKnownMessageId String    @map("last_known_message_id")
+  // Snapshotted for display in the banner/brief without re-fetching the thread.
+  subject            String?
+  contact            String? // the other party we're waiting on (display name/email)
+  remindAt           DateTime  @map("remind_at")
+  // "waiting" (armed) | "replied" (got a reply, cleared) | "done" (dismissed)
+  status             String    @default("waiting")
+  note               String?
+  // Set the first time the cron surfaces an overdue, still-unanswered follow-up,
+  // so we publish the realtime nudge exactly once.
+  surfacedAt         DateTime? @map("surfaced_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, threadId])
+  @@index([userId, status, remindAt])
+  @@map("follow_up")
+}
+
+model BookingLink {
+  id           Int      @id @default(autoincrement())
+  // Public, unguessable slug used in the shareable /book/<slug> URL.
+  slug         String   @unique
+  userId       String   @map("user_id")
+  title        String
+  durationMins Int      @map("duration_mins")
+  // How far into the future bookers may pick a slot.
+  windowDays   Int      @map("window_days")
+  // Daily availability window, in `timezone`, as 24h integer hours (e.g. 9–17).
+  hoursStart   Int      @map("hours_start")
+  hoursEnd     Int      @map("hours_end")
+  timezone     String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("booking_link")
+}
+
+model InboxEvent {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  plugin    String // "gmail" | "googlecalendar"
+  type      String // event kind from the Corsair webhook payload
+  payload   Json // raw normalized webhook payload, for debugging/replay
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("inbox_event")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("verification")
+}
+
 model Waitlist {
   id        Int      @id @default(autoincrement())
   email     String   @unique

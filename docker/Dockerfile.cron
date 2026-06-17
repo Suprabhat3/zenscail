@@ -1,0 +1,11 @@
+# Lightweight scheduler container: busybox crond + curl.
+# Multi-arch (works on amd64 and arm64) with no binary downloads.
+# Triggers the app's /api/cron/* endpoints on schedule — see cron-entrypoint.sh.
+FROM alpine:3.20
+
+RUN apk add --no-cache curl ca-certificates
+
+COPY docker/cron-entrypoint.sh /usr/local/bin/cron-entrypoint.sh
+RUN chmod +x /usr/local/bin/cron-entrypoint.sh
+
+CMD ["/usr/local/bin/cron-entrypoint.sh"]

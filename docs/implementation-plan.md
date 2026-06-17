@@ -113,7 +113,10 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** the example use case works: "Send a calendar invite to friend@corsair.dev at 9 AM next Thursday. Send him an email too…"
 
-## Phase 6 — Realtime webhooks (bonus)
+## Phase 6 — Realtime webhooks (bonus) — ✅ DONE (2026-06-13, day 4)
+
+> **Implemented.** Registration mechanism resolved (see corsair-reference.md "Webhook delivery (RESOLVED)"): single dashboard-registered endpoint, per-tenant token in the URL. `app/api/webhooks/corsair/route.ts` receives events, auth'd by an HMAC token (`lib/webhooks.ts`, `APP_SECRET`) since `processWebhook`/provider-signature verification isn't in SDK 0.1.5. New mail triggers `classifyMessages` inline (Phase 7's realtime trigger) + publishes to an in-memory bus (`lib/realtime.ts`). Per-user SSE endpoint `app/api/stream/route.ts`; client `components/realtime/LiveUpdates.tsx` (mounted in `(app)/layout.tsx`) re-fetches the inbox/calendar on relevant events. `InboxEvent` model added + pushed. `pnpm webhook:url` prints the per-tenant URL to register. Smoke-tested live (401 on bad/missing token, 200 + classify + log + publish on valid). **Remaining manual step:** ngrok tunnel + register the URL in the Corsair dashboard (no SDK RPC for it).
+
 
 1. `app/api/webhooks/corsair/route.ts` receives `gmail.webhooks.messageChanged` and `googlecalendar.webhooks.onEventChanged`. Check the Corsair dashboard/docs for the exact registration mechanism and signature verification (this detail isn't in our cached reference — fetch `https://docs.corsair.dev/app/direct-execution.md` neighbors or the dashboard when implementing).
 2. Local dev: ngrok tunnel (`ngrok http 3000`) → register the tunnel URL as webhook target.
@@ -123,7 +126,10 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** new email appears in the inbox within seconds, no manual refresh.
 
-## Phase 7 — AI priority filtering (bonus)
+## Phase 7 — AI priority filtering (bonus) — ✅ DONE (2026-06-12, day 3)
+
+> **Implemented via backfill-on-render** (the webhook trigger from Phase 6 is deferred). `EmailMeta` model + `lib/ai/classify.ts` (`classifyMessages` / `getPriorities`, `cheapModel` + `generateObject`, best-effort no-throw), badge + "Urgent first" toggle in `/mail`. Needs `OPENAI_API_KEY` or a BYOK key to classify. Details in handoff.md day-3 update.
+
 
 1. Prisma: `EmailMeta` (gmailMessageId, userId, priority: `urgent|normal|low`, reason, createdAt).
 2. Classifier in `lib/ai/classify.ts`: cheap model (cloud: `gpt-4.1-mini`/nano; BYOK: cheapest model of their provider) with `generateObject` → `{ priority, reason }` from subject + first ~1k chars of body.
@@ -140,12 +146,16 @@ Routes under `(app)/calendar`:
 
 **Deliverable:** full mail triage without touching the mouse.
 
-## Phase 9 — Polish & demo readiness
+## Phase 9 — Polish & demo readiness — 🟡 IN PROGRESS (2026-06-12, day 3)
 
-- Loading/empty/error states everywhere; re-auth redirect path tested (revoke + reconnect).
-- Rate-limit chat endpoint; cap `stopWhen` steps.
-- Seed/demo script and a rehearsed demo flow: sign in → connect → inbox triage (keyboard) → webhook live email → chat sends invite + email.
-- `README` update: env vars (`DATABASE_URL`, `CORSAIR_DEV_KEY`, `CORSAIR_INSTANCE_ID`, `OPENAI_API_KEY`, `APP_SECRET`, auth secrets), setup steps, provisioning script.
+- ✅ **Loading states:** `app/(app)/mail/loading.tsx` + `calendar/loading.tsx` (skeletons) — the inbox/calendar fire live API reads so suspense fallbacks matter.
+- ✅ **Error boundary:** `app/(app)/error.tsx` (client) — friendly "something went wrong" with Try again + Reconnect-account actions, covers the whole authed shell.
+- ✅ **Empty states:** already present in mail + calendar pages.
+- ✅ **Calendar content fix:** `lib/gcal.ts` `searchCachedEvents` read content (`summary`/`start`/`end`) from `googlecalendar.db.events.search`, which — like the Gmail cache — only stores minimal refs, so events rendered as "(no title)" and got filtered out. Replaced with `listEvents()` reading live from `api.events.getMany` (server-side time-range filter); `calendar/page.tsx` now redirects to `/connect` on `ok:false`. Mirrors the proven Gmail hydration fix.
+- ✅ **Chat rate/abuse guard:** message-count cap (100) + `stopWhen: stepCountIs(15)` already in `app/api/chat/route.ts`.
+- ✅ **README** rewritten: features, stack, env vars, GCP setup, provisioning, usage flow, structure, limitations.
+- ⬜ Re-auth redirect path tested live (revoke + reconnect).
+- ⬜ Seed/demo script and rehearsed demo flow.
 
 ---
 

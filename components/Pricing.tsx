@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { Reveal } from "./Reveal";
+import { CLOUD_PLAN } from "@/lib/plan";
+import { CloudPlanCta } from "./CloudPlanCta";
 
 const Check = ({ color }: { color: string }) => (
   <svg width="16" height="16" viewBox="0 0 15 15" aria-hidden="true">
@@ -20,7 +23,8 @@ export function Pricing() {
         <Reveal className="section-head">
           <span className="eyebrow">Pricing</span>
           <h2 className="display">
-            Free <em>by nature.</em>
+            Free <em>by nature.</em> <br />
+            Paid <em>for Convenience</em>
           </h2>
           <p className="lede">
             ZenScail is built around a simple idea: the app is free. Bring your
@@ -37,7 +41,7 @@ export function Pricing() {
               Plug in your own API keys. The whole app, no meter running.
             </p>
             <div className="price-figure">
-              <span className="pf-amount">$0</span>
+              <span className="pf-amount">₹0</span>
               <span className="pf-per">forever — you only pay your AI provider</span>
             </div>
             <ul className="price-list">
@@ -57,23 +61,33 @@ export function Pricing() {
             <div className="byok-chips">
               <span className="byok-chip">OpenAI</span>
               <span className="byok-chip">Anthropic</span>
-              <span className="byok-chip">Gemini</span>
-              <span className="byok-chip">Mistral</span>
-              <span className="byok-chip">Ollama (local)</span>
+              <span className="byok-chip">Google Gemini</span>
+              <span className="byok-chip">Groq</span>
             </div>
-            <a className="btn btn-ghost" href="#join" style={{ marginTop: 28 }}>
-              Join the waitlist
-            </a>
+            <Link className="btn btn-ghost" href="/login?mode=signup" style={{ marginTop: 28 }}>
+              Start free
+            </Link>
           </Reveal>
 
           <Reveal delay={1} className="price-card featured">
+            <span className="pc-tag">{CLOUD_PLAN.discountPct}% off in beta</span>
             <h3>ZenScail Cloud</h3>
             <p className="pc-sub">
               No keys, no setup. Our models, tuned for email — it just works.
             </p>
             <div className="price-figure">
-              <span className="pf-amount">$12</span>
-              <span className="pf-per">per month, when we launch</span>
+              <span className="pf-amount">₹{CLOUD_PLAN.price}</span>
+              <span
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 24,
+                  color: "#B8AE9C",
+                  textDecoration: "line-through",
+                }}
+              >
+                ₹{CLOUD_PLAN.listPrice}
+              </span>
+              <span className="pf-per">per month</span>
             </div>
             <ul className="price-list">
               <li>
@@ -89,9 +103,9 @@ export function Pricing() {
                 <span>Priority support and early features</span>
               </li>
             </ul>
-            <a className="btn btn-accent" href="#join">
-              Join the waitlist
-            </a>
+            <div style={{ marginTop: 8 }}>
+              <CloudPlanCta />
+            </div>
           </Reveal>
         </div>
         <Reveal className="privacy-callout">
@@ -103,14 +117,14 @@ export function Pricing() {
             </svg>
           </span>
           <div>
-            <h3>Your API keys never touch our servers</h3>
+            <h3>Your API keys are encrypted and stay yours</h3>
             <p>
               Bring your own keys with total peace of mind. Your key is{" "}
-              <strong>encrypted and stored only on your device</strong> — we
-              never save it in our database, and it never passes through our
-              servers. And because it&rsquo;s encrypted on your device, no
-              other website, extension, or attacker can read or use it. Your
-              keys stay yours, full stop.
+              <strong>encrypted with AES-256 before it&rsquo;s stored</strong>,
+              decrypted only in memory for the instant a request runs, and
+              never written to logs or shown back to you in full. It&rsquo;s
+              never exposed to other users, and we never use your email or
+              prompts to train any model. Your keys stay yours, full stop.
             </p>
           </div>
         </Reveal>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 
@@ -26,26 +26,44 @@ export const metadata: Metadata = {
     template: "%s · ZenScail",
   },
   description: DESCRIPTION,
+  applicationName: "ZenScail",
+  category: "productivity",
   keywords: [
-    "email assistant",
     "AI email",
-    "calendar assistant",
-    "daily brief",
+    "AI email assistant",
+    "AI email management",
+    "email management app",
+    "manage email and calendar",
+    "AI inbox management",
+    "AI calendar assistant",
+    "AI scheduling assistant",
+    "email and calendar app",
+    "Gmail AI assistant",
+    "Google Calendar AI",
+    "daily email brief",
+    "AI email summarization",
+    "AI reply drafting",
     "inbox zero",
-    "AI scheduling",
-    "email summarization",
-    "productivity",
+    "smart inbox",
+    "email triage",
+    "AI productivity app",
   ],
   authors: [{ name: "Suprabhat", url: "https://new.suprabhat.site" }],
   creator: "Suprabhat",
+  publisher: "ZenScail",
   alternates: { canonical: "/" },
+  verification: {
+    // Set GOOGLE_SITE_VERIFICATION in the environment to emit the
+    // <meta name="google-site-verification"> tag for Search Console.
+    google: process.env.GOOGLE_SITE_VERIFICATION,
+  },
   openGraph: {
     type: "website",
     url: SITE_URL,
     siteName: "ZenScail",
     title: TITLE,
     description:
-      "One calm morning brief instead of a hundred unread emails. ZenScail reads your inbox and calendar, drafts replies in your voice, and protects your deep-work time.",
+      "Inbox (3,481). Anxiety (immeasurable). ZenScail reads it all, drafts replies in your voice, guards your deep-work time, and hands you one calm morning brief. You bring the API key; we bring the peace.",
     locale: "en_US",
     images: [
       {
@@ -60,7 +78,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description:
-      "One calm morning brief instead of a hundred unread emails. Your inbox and calendar, finally at peace.",
+      "Therapy is expensive. Inbox zero is free (BYO API key). ZenScail turns a hundred unread emails into one calm morning brief — and replies in your voice while you touch grass.",
     images: ["/og.webp"],
     creator: "@suprabhat_3",
   },
@@ -71,10 +89,84 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  appleWebApp: {
+    capable: true,
+    title: "ZenScail",
+    statusBarStyle: "default",
+  },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
+};
+
+/**
+ * Structured data (schema.org) so Google can render rich results and understand
+ * what ZenScail is. Three linked nodes: the software app, the publishing org,
+ * and the website itself (which exposes a sitewide search action).
+ */
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#app`,
+      name: "ZenScail",
+      applicationCategory: "BusinessApplication",
+      applicationSubCategory: "Email & Calendar Assistant",
+      operatingSystem: "Web",
+      url: SITE_URL,
+      description: DESCRIPTION,
+      featureList: [
+        "AI priority inbox",
+        "Daily AI brief of email and calendar",
+        "AI reply drafting in your voice",
+        "Natural-language email and calendar agent",
+        "Smart inbox bundles",
+        "Snooze, send later and undo send",
+        "AI scheduling and booking links",
+      ],
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        description: "Free forever with your own API key.",
+      },
+      publisher: { "@id": `${SITE_URL}/#org` },
+    },
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#org`,
+      name: "ZenScail",
+      url: SITE_URL,
+      logo: `${SITE_URL}/android-chrome-512x512.png`,
+      sameAs: ["https://twitter.com/suprabhat_3"],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: "ZenScail",
+      description: DESCRIPTION,
+      publisher: { "@id": `${SITE_URL}/#org` },
+    },
+  ],
+};
+
+export const viewport: Viewport = {
+  // Fill the screen edge-to-edge on notched phones; our safe-area padding
+  // (see globals.css) keeps content clear of the notch and home indicator.
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#FAF5EC",
 };
 
 export default function RootLayout({
@@ -84,7 +176,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+      {/* Browser extensions (e.g. ColorZilla) inject attributes like
+          `cz-shortcut-listen` onto <body> before React hydrates, which trips a
+          dev-only hydration mismatch warning. suppressHydrationWarning silences
+          that one element without affecting real mismatches inside the app. */}
+      <body suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          // Static, app-authored object — safe to inline as JSON-LD.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+        />
+        {children}
+      </body>
     </html>
   );
 }
