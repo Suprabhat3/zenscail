@@ -8,7 +8,7 @@ An AI-native Gmail + Google Calendar workspace built on [**Corsair**](https://co
 
 **🔗 Live app → [https://zenscail.com](https://zenscail.com)**
 
-[Features](#-what-makes-zenscail-different) · [Demo flow](#-the-flagship-demo) · [Architecture](#-architecture) · [Corsair usage](#-how-we-use-corsair) · [Run it locally](#-running-locally) · [Deployment](#-deployment)
+[Features](#-what-makes-zenscail-different) · [Productivity extras](#-productivity-extras) · [Demo flow](#-the-flagship-demo) · [Architecture](#-architecture) · [Corsair usage](#-how-we-use-corsair) · [Run it locally](#-running-locally) · [Deployment](#-deployment)
 
 </div>
 
@@ -37,6 +37,27 @@ The result is a single surface where you can clear an inbox without touching the
 
 ---
 
+## 🦾 Superhuman-grade extras
+
+Beyond the core, ZenScail ships a full suite of Superhuman-class productivity features — every one of these works end to end:
+
+| | Feature | What it does |
+|---|---|---|
+| ⌘ | **Command palette (⌘K)** | One overlay to navigate, act, search live mail, and invoke the AI agent. Context-aware actions (Reply / Archive / Snooze appear when a thread is open) and an always-present "Ask ZenScail" row that hands your text to the agent. |
+| 😴 | **Snooze** | Send a thread out of the inbox and have it reappear at a chosen time (1h / this evening / tomorrow / next week / custom). `h` snoozes the focused thread; a **Snoozed** tab lists what's coming back. |
+| ⏰ | **Send Later** | Split-button compose & reply — schedule mail for tonight, tomorrow morning, Monday, or a custom time. A **Scheduled** tab lists pending sends with one-click Cancel. |
+| ↩️ | **Undo Send** | Every send opens a few-second retract window with a toast countdown. Configurable length (0/5/10/30s) in mail settings. |
+| 🗂️ | **Smart bundles / split inbox** | The flat inbox splits into collapsible 📌 Important · 📰 Newsletters · 👥 Social · 🔔 Notifications · 📥 Everything else, with counts and **Mark all read / Archive all** per bundle. A cheap header pre-filter categorizes obvious bulk mail with **zero extra LLM calls**. Toggle Bundled ⇄ Flat. |
+| 💬 | **Instant AI reply chips** | Open a thread → get 3 distinct-intent, one-tap reply suggestions (accept / propose alternative / clarify). Tapping (or `1`/`2`/`3`) pre-fills the editable reply box — never auto-sends. |
+| 🔔 | **Follow-up reminders** | "Remind me if no reply in X days" on any thread. If no inbound reply arrives, ZenScail resurfaces it (inbox banner + high-urgency daily-brief item) and offers an AI-drafted nudge. |
+| ⚡ | **Natural-language quick-add bar** | A header input that parses one-shot commands — *"lunch with Sam tomorrow 1pm"* creates an event (with an inline confirm), *"email Dana the deck is ready"* opens a prefilled composer, a query searches mail, anything complex hands off to the agent. |
+| 🔗 | **Scheduling links (Calendly-style)** | Mint a public booking link from your real free/busy. Guests pick a timezone-correct open slot on an unauthenticated page; the event lands on your calendar with them invited (with a double-book guard). |
+| ✍️ | **Smart compose autocomplete** | Inline gray ghost-text completions in the composer; **Tab** to accept, **Esc** to dismiss. Off by default, toggleable in mail settings. |
+
+> Full design notes and per-feature implementation details live in [`docs/bonus-features.md`](docs/bonus-features.md).
+
+---
+
 ## 🎬 The flagship demo
 
 > **"Send a calendar invite to dev@corsair.dev at 9 AM next Thursday. Send him an email too saying I look forward to our meeting."**
@@ -62,10 +83,12 @@ Open `/chat`, type that, and ZenScail will — through the Corsair MCP — creat
         │  /api/chat      ──► streamText(model) + Corsair MCP tools (agent)     │
         │  /api/webhooks  ──► verify token → log → classify → SSE publish       │
         │  /api/stream    ──► per-user Server-Sent Events                       │
-        │  /api/cron      ──► daily brief generation (Vercel Cron)              │
+        │  /api/cron      ──► daily brief · snooze-wake · scheduled-send ·      │
+        │                     follow-ups (Vercel Cron + opportunistic catch-up) │
         │                                                                       │
         │  Prisma 7 + Neon Postgres: users, AI settings (encrypted BYOK keys),  │
-        │     email priority metadata, daily briefs, webhook event log          │
+        │     email priority + category metadata, daily briefs, webhook log,    │
+        │     snoozed threads, scheduled sends, follow-ups, booking links       │
         └───────────────────────────────────────────────────────────────────────┘
                  │
                  ▼
@@ -192,18 +215,25 @@ Corsair delivers events to one token-authenticated endpoint. For local testing, 
 app/
   (app)/            authenticated shell — mail, calendar, chat, dashboard, settings, connect
   (auth)/login      sign in / sign up
+  book/[slug]       public, unauthenticated booking page (scheduling links)
   api/
     auth/[...all]   Better Auth handler
     chat            streaming agent chat (Corsair MCP tools)
     webhooks/corsair  inbound Corsair webhook receiver
     stream          per-user Server-Sent Events
-    cron/daily-summary  scheduled daily brief
+    compose-complete  smart-compose ghost-text endpoint
+    cron/           daily-summary · snooze-wake · scheduled-send · follow-ups
 lib/
   corsair.ts · tenant.ts    Corsair client + per-user tenant mapping
   gmail.ts · gcal.ts        typed Gmail / Calendar operation helpers
   ai/                       provider registry, model lists, classifier, daily brief, MCP transport
+  scheduledSend.ts · snooze.ts · followUp.ts · booking.ts  productivity engines
   realtime.ts · webhooks.ts SSE bus + webhook token verification
   auth.ts · session.ts · crypto.ts
+components/
+  command/                  command palette (⌘K) + natural-language quick-add bar
+  mail/                     bundles, reply chips, snooze/send-later, smart compose
+  ui/Toast.tsx              undo-send / snooze / scheduled toasts
 scripts/            Corsair provisioning, status checks, webhook URL helper (ESM .mts)
 docs/               implementation plan, handoff notes, verified Corsair API reference
 prisma/schema.prisma

@@ -154,7 +154,6 @@ export function BriefActionItems({
   const router = useRouter();
   const [states, setStates] = useState<BriefItemStates>(initialStates);
   const [, startTransition] = useTransition();
-  const [showDone, setShowDone] = useState(false);
   const now = useNow();
 
   function commit(key: string, next: BriefItemStates[string] | null) {
@@ -232,31 +231,29 @@ export function BriefActionItems({
       )}
 
       {done.length > 0 && (
-        <div className="mt-4">
-          <button
-            onClick={() => setShowDone((v) => !v)}
-            className="text-xs font-semibold text-(--muted) hover:text-(--accent)"
-          >
-            {showDone ? "Hide" : "Show"} {done.length} completed
-          </button>
-          {showDone && (
-            <div className="mt-2 space-y-1.5">
-              {done.map((item) => (
-                <div
-                  key={keyOf(item)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-(--muted)"
-                >
-                  <span className="min-w-0 flex-1 truncate line-through">{item.title}</span>
-                  <button
-                    onClick={() => commit(keyOf(item), null)}
-                    className="shrink-0 font-semibold text-(--accent) hover:text-(--accent-deep)"
-                  >
-                    Undo
-                  </button>
-                </div>
-              ))}
+        <div className="mt-5 space-y-1.5">
+          <p className="text-[11px] font-bold tracking-widest text-[#4D5C40] uppercase">
+            Done today · {done.length}
+          </p>
+          {done.map((item) => (
+            <div
+              key={keyOf(item)}
+              className="flex items-center gap-2.5 rounded-lg border border-[#D6E0CB] bg-[#EAEFE4] px-3 py-2 text-sm"
+            >
+              <span className="grid size-4 shrink-0 place-items-center rounded-full bg-(--sage) text-white">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[#4D5C40] line-through">{item.title}</span>
+              <button
+                onClick={() => commit(keyOf(item), null)}
+                className="shrink-0 text-xs font-semibold text-(--sage) hover:text-[#4D5C40]"
+              >
+                Undo
+              </button>
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
