@@ -207,7 +207,57 @@ fix it. Confirm with the raw/probe scripts before changing transport strategy.
 
 ---
 
+## 11) Addendum (2026-06-17, third pass) — why it was still ~50%, and the real fix
+
+Users still hit `Session not found` ~50% of the time. New investigation (live
+stress probe) pinned down two compounding facts:
+
+1. **Corsair's MCP exposes only 3 generic meta-tools** — `list_operations`,
+   `get_schema`, `run_script` — not per-operation Gmail/Calendar tools. So every
+   agent action is a *chain* of session POSTs (discover → schema → run). Each
+   POST independently risks the bad-session window, so the per-action failure
+   probability compounds toward ~50%.
+2. **The handshake itself is reliable when Corsair is healthy.** A stress run
+   during a good window: 30/30 fresh `initialize → tools/list`, 0 races, 20/20
+   calls on a warmed session. By contrast the **stateless `tenant.run()` REST
+   path** (what the whole app uses for inbox/calendar) was 20/20 and never
+   races — it has no session to lose. The flakiness is purely Corsair's
+   *stateful MCP session layer*, not our transport code.
+
+Two latent bugs found while here:
+
+- **`WRITE_TOOL_RE` was dead code.** It filtered tools by names like
+  `messages.send`, but the only tool names are `list_operations`/`get_schema`/
+  `run_script` — none matched. So the agent could `run_script` a
+  `gmail.api.messages.send` and **bypass the review-first compose flow**.
+- The "MCP unavailable → no read tools, answer text-only" fallback made a bad
+  Corsair window look like a total agent failure.
+
+### Fix implemented (`lib/ai/assistant.ts`)
+
+- **MCP stays primary** (it's the high-value bonus: "agent chat using Corsair
+  MCP", per `docs/faq.md` / `docs/requirement.md`).
+- **Direct `tenant.run()` fallback read tools** (`searchInbox`, `readThread`,
+  `listCalendarEvents`, `checkAvailability`) kick in only when MCP can't be
+  reached, so a bad Corsair window degrades to the reliable REST path instead of
+  dropping all read tools. Built on the same helpers the app already uses
+  (`lib/gmail.ts`, `lib/gcal.ts`) — smoke-tested live.
+- **Shorter MCP connect window** (4 attempts ≈2s, was 6 ≈10s): with a reliable
+  fallback, fail over fast rather than make the user wait.
+- **`guardMcpWrites`** wraps `run_script` and refuses any mutating op
+  (`WRITE_OP_RE`), steering the agent to `composeEmail`/`scheduleEvent`. Restores
+  the never-auto-send guarantee that `WRITE_TOOL_RE` no longer provided.
+
+### Validation
+
+- `pnpm exec tsc --noEmit`: pass. `eslint lib/ai/assistant.ts`: clean.
+- Live: stateless `gmail.api.messages.list` + `googlecalendar.api.events.getMany`
+  + `gmail.api.labels.list` succeed 20/20 — the fallback rests on proven ops.
+
+---
+
 If handoff requires exact code diff context, reference:
 
+- `lib/ai/assistant.ts` (MCP-first + tenant.run() fallback + run_script guard)
 - `app/api/chat/route.ts`
 - `scripts/mcp-probe.mts`

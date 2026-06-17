@@ -13,7 +13,13 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getModelForUser } from "@/lib/ai/registry";
 import { getTodayBrief } from "@/lib/ai/brief";
-import { listInboxMessages } from "@/lib/gmail";
+import {
+  listInboxMessages,
+  getThread,
+  extractBodies,
+  header,
+} from "@/lib/gmail";
+import { listEvents, getAvailability } from "@/lib/gcal";
 
 type McpTools = Awaited<ReturnType<Awaited<ReturnType<typeof createMCPClient>>["tools"]>>;
 type McpClient = { tools: () => Promise<McpTools>; close?: () => Promise<void> | void };
@@ -22,14 +28,61 @@ type Connected = { client: McpClient; tools: McpTools };
 const CORSAIR_TENANT_HEADER = "X-Corsair-Tenant-Id";
 
 /**
- * MCP tools that *create or send* on the user's behalf. We hide these from the
- * assistant so it can never silently send an email or create an event: the only
- * way to act is through our local `composeEmail` / `scheduleEvent` tools, which
- * hand the user a pre-filled screen to review and confirm. Read tools (list /
- * get / search) and other edits stay available so the agent can still find the
- * right person, thread, or free slot before drafting.
+ * Corsair's hosted MCP doesn't expose per-operation tools — it exposes three
+ * generic meta-tools: `list_operations`, `get_schema`, and `run_script` (run JS
+ * with a `corsair` handle). `run_script` can therefore execute ANY operation,
+ * including `gmail.api.messages.send` / `googlecalendar.api.events.create` — i.e.
+ * the agent could silently send mail or create events, bypassing our
+ * review-first flow. So instead of filtering tools by name (no name ever
+ * matched, which is why this used to be a no-op), we inspect the `run_script`
+ * code and refuse any mutating operation. The only way to act stays our local
+ * `composeEmail` / `scheduleEvent` tools, which hand the user a screen to
+ * confirm. Read ops (list/get/getMany/search/getAvailability) run freely.
  */
-const WRITE_TOOL_RE = /(\.send\b|messages?[._]send|drafts?[._](send|create)|events?[._](create|insert|quickadd))/i;
+const WRITE_OP_RE =
+  /\.api\.[a-z]+\.(send|create|insert|update|delete|trash|untrash|modify|batchmodify)\b/i;
+
+/**
+ * Wrap the MCP `run_script` tool so it refuses mutating Corsair operations,
+ * returning a result that steers the agent to the review-first tools instead of
+ * throwing (a thrown error would look like a transient MCP failure). Other MCP
+ * tools (`list_operations`, `get_schema`) pass through untouched.
+ */
+function guardMcpWrites(tools: McpTools): McpTools {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, tool]) => {
+      if (name !== "run_script") return [name, tool];
+      const run = tool as unknown as {
+        execute: (a: unknown, o: unknown) => Promise<unknown>;
+      };
+      return [
+        name,
+        {
+          ...tool,
+          execute: async (args: unknown, opts: unknown) => {
+            const code =
+              args && typeof (args as { code?: unknown }).code === "string"
+                ? (args as { code: string }).code
+                : "";
+            if (WRITE_OP_RE.test(code)) {
+              return {
+                isError: true,
+                content: [
+                  {
+                    type: "text",
+                    text:
+                      "Refused: this tool is read-only. To send an email, call the composeEmail tool; to create or change a calendar event, call scheduleEvent. Both open a screen the user reviews and confirms before anything is sent.",
+                  },
+                ],
+              };
+            }
+            return run.execute(args, opts);
+          },
+        },
+      ];
+    }),
+  ) as McpTools;
+}
 
 /* ------------------------------------------------------------------ */
 /* Corsair MCP connection (shared by chat + quick-command agent)      */
@@ -68,11 +121,13 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Connect to Corsair's hosted MCP server, tolerating its intermittently
  * inconsistent session store: a fresh `initialize` can 404 on the next POST for
  * a few seconds, then work again. We re-initialize with exponential backoff +
- * jitter (≈10s total) so a transient window is absorbed. Null only if every
- * attempt fails.
+ * jitter so a brief transient window is absorbed. We keep this window short
+ * (~2s) on purpose: when MCP can't be reached, `loadAssistant` fails over to
+ * the direct `tenant.run()` read tools, so it's better to fail fast than make
+ * the user wait. Null only if every attempt fails.
  */
 async function connectMcp(tenantId: string): Promise<Connected | null> {
-  const maxAttempts = 6;
+  const maxAttempts = 4;
   let lastErr: unknown;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let client: McpClient | undefined;
@@ -138,6 +193,110 @@ function resilientMcpTools(
       },
     ]),
   ) as McpTools;
+}
+
+/* ------------------------------------------------------------------ */
+/* Direct read tools (fallback when Corsair MCP is unreachable)        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The same Gmail/Calendar reads the agent would do through MCP `run_script`,
+ * but backed by the stateless `tenant.run()` REST path the rest of the app
+ * uses (inbox, calendar, daily brief) — no MCP session handshake, so the
+ * intermittent "Session not found" window can't bite. We only hand these to the
+ * agent when an MCP connection couldn't be established, so MCP stays the primary
+ * path; this just keeps the assistant useful during a bad Corsair window
+ * instead of dropping all read tools and answering text-only.
+ */
+function fallbackReadTools(tenantId: string, userId: string) {
+  const t = () => corsairTenant(tenantId);
+  return {
+    searchInbox: tool({
+      description:
+        "Search or list the user's Gmail. Returns matching messages (sender, subject, snippet, date, id, threadId). Use Gmail search syntax in `query` (e.g. 'from:sam newer_than:7d', 'subject:invoice'), or null to list the inbox.",
+      inputSchema: z.object({
+        query: z.string().nullable().describe("Gmail search query, or null for the inbox."),
+        limit: z.number().nullable().describe("Max messages to return (default 20)."),
+      }),
+      execute: async ({ query, limit }) => {
+        const { ok, messages } = await listInboxMessages(t(), {
+          query: query ?? undefined,
+          limit: limit ?? 20,
+          userId,
+        });
+        if (!ok) return { error: "Mailbox not connected." };
+        return {
+          messages: messages.map((m) => ({
+            id: m.id,
+            threadId: m.threadId,
+            from: m.from,
+            subject: m.subject,
+            snippet: m.snippet,
+            date: new Date(m.internalDate).toISOString(),
+            unread: m.unread,
+          })),
+        };
+      },
+    }),
+    readThread: tool({
+      description:
+        "Read a full Gmail conversation by its threadId (from searchInbox). Returns each message's sender, recipients, subject, date, and plain-text body so you can reply with context.",
+      inputSchema: z.object({
+        threadId: z.string().describe("The thread id to read."),
+      }),
+      execute: async ({ threadId }) => {
+        const res = await getThread(t(), threadId);
+        if (!res.success) return { error: "Could not read thread (mailbox not connected?)." };
+        const messages = (res.data.messages ?? []).map((m) => {
+          const { text, html } = extractBodies(m.payload);
+          return {
+            from: header(m.payload, "From"),
+            to: header(m.payload, "To"),
+            subject: header(m.payload, "Subject"),
+            date: header(m.payload, "Date"),
+            body: (text || html).slice(0, 4000),
+          };
+        });
+        return { messages };
+      },
+    }),
+    listCalendarEvents: tool({
+      description:
+        "List the user's Google Calendar events in a time range (summary, start, end, location, attendees). Provide ISO 8601 start/end; defaults to the next 7 days from now.",
+      inputSchema: z.object({
+        startIso: z.string().nullable().describe("Range start as ISO 8601, or null for now."),
+        endIso: z.string().nullable().describe("Range end as ISO 8601, or null for 7 days out."),
+      }),
+      execute: async ({ startIso, endIso }) => {
+        const start = startIso ? new Date(startIso) : new Date();
+        const end = endIso ? new Date(endIso) : new Date(start.getTime() + 7 * 86_400_000);
+        const { ok, messages } = await listEvents(t(), { rangeStart: start, rangeEnd: end });
+        if (!ok) return { error: "Calendar not connected." };
+        return {
+          events: messages.map((e) => ({
+            id: e.id,
+            summary: e.summary ?? "(no title)",
+            start: e.start?.dateTime ?? e.start?.date,
+            end: e.end?.dateTime ?? e.end?.date,
+            location: e.location ?? null,
+            attendees: (e.attendees ?? []).map((a) => a.email).filter(Boolean),
+          })),
+        };
+      },
+    }),
+    checkAvailability: tool({
+      description:
+        "Check the user's free/busy times over an ISO 8601 range, to find an open slot before scheduling. Returns the busy intervals.",
+      inputSchema: z.object({
+        startIso: z.string().describe("Range start as ISO 8601."),
+        endIso: z.string().describe("Range end as ISO 8601."),
+      }),
+      execute: async ({ startIso, endIso }) => {
+        const busy = await getAvailability(t(), new Date(startIso), new Date(endIso));
+        return { busy };
+      },
+    }),
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -409,24 +568,21 @@ export async function loadAssistant(opts: {
     getTodayBrief(userId).catch(() => null),
   ]);
 
+  // MCP-first: use Corsair's hosted MCP (the high-value bonus path) for the
+  // agent's Gmail/Calendar reads. If it can't be reached after a short retry
+  // window — Corsair's session store is intermittently inconsistent — fail over
+  // to the direct `tenant.run()` read tools so the assistant stays useful.
   const clients: McpClient[] = [];
   const connected = await connectMcp(tenantId);
-  let mcpTools: McpTools = {} as McpTools;
+  let readTools: Record<string, unknown>;
   if (connected) {
     clients.push(connected.client);
-    const all = resilientMcpTools(tenantId, clients, connected);
-    // Drop create/send tools so the agent can only act through our review flow.
-    const dropped: string[] = [];
-    mcpTools = Object.fromEntries(
-      Object.entries(all).filter(([name]) => {
-        const keep = !WRITE_TOOL_RE.test(name);
-        if (!keep) dropped.push(name);
-        return keep;
-      }),
-    ) as McpTools;
-    if (dropped.length) console.info("assistant: routed through review flow:", dropped.join(", "));
+    // Keep all MCP tools, but guard `run_script` so writes can't bypass review.
+    readTools = guardMcpWrites(resilientMcpTools(tenantId, clients, connected));
+    console.info("assistant: using Corsair MCP read tools");
   } else {
-    console.error("assistant: MCP unavailable; answering without Gmail/Calendar read tools");
+    readTools = fallbackReadTools(tenantId, userId);
+    console.warn("assistant: Corsair MCP unreachable — using direct tenant.run() read tools");
   }
 
   const closeAll = async () => {
@@ -439,16 +595,20 @@ export async function loadAssistant(opts: {
     );
   };
 
+  // Reads are available either way now (MCP or the direct fallback), so the
+  // agent always has Gmail/Calendar read tools — `connected` reflects that.
+  const hasReadTools = Object.keys(readTools).length > 0;
+
   return {
     userId,
     model,
     system: buildSystem(identity, {
-      connected: Boolean(connected),
+      connected: hasReadTools,
       brief,
       quickCommand: Boolean(opts.quickCommand),
     }),
-    tools: { ...mcpTools, ...actionTools(userId, opts.onDirective) },
-    connected: Boolean(connected),
+    tools: { ...readTools, ...actionTools(userId, opts.onDirective) },
+    connected: hasReadTools,
     closeAll,
   };
 }

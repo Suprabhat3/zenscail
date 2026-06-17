@@ -54,7 +54,6 @@ export function Footer() {
               <li><a href="/#features">Features</a></li>
               <li><a href="/#demo">Live demo</a></li>
               <li><a href="/#pricing">Pricing</a></li>
-              <li><a href="/#join">Waitlist</a></li>
             </ul>
           </div>
           <div>

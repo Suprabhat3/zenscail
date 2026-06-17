@@ -47,7 +47,20 @@ body {
   overflow-x: hidden;
 }
 
-::selection { background: var(--accent-tint); }
+/* Light sections: soft rose tint with dark ink text stays legible */
+::selection { background: var(--accent-tint); color: var(--ink); }
+
+/* Dark sections: pale tint washes out light text — use a solid rose
+   highlight with cream text so the selection reads with strong contrast */
+.brief-stage ::selection,
+.brief-stage::selection,
+.price-card.featured ::selection,
+.price-card.featured::selection,
+.doc-contact ::selection,
+.doc-contact::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
 
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; }
