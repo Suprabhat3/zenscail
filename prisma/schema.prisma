@@ -178,6 +178,7 @@ model DailyBrief {
   actionItems Json     @map("action_items") // BriefActionItem[] — see lib/ai/brief.ts
   events      Json // BriefEvent[] — today's calendar snapshot at generation time
   stats       Json // { emailsReviewed, urgentCount, meetingsToday }
+  itemStates  Json?    @map("item_states") // Record<itemKey, { status: "done"|"snoozed"; until?: string }> — dashboard interactions
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

@@ -40,6 +40,10 @@ export type BriefStats = {
   meetingsToday: number;
 };
 
+/** Per-item interaction state, keyed by the item's stable key (see itemKey). */
+export type BriefItemState = { status: "done" | "snoozed"; until?: string };
+export type BriefItemStates = Record<string, BriefItemState>;
+
 export type Brief = {
   date: string;
   headline: string;
@@ -47,8 +51,17 @@ export type Brief = {
   actionItems: BriefActionItem[];
   events: BriefEvent[];
   stats: BriefStats;
+  itemStates: BriefItemStates;
   createdAt: Date;
 };
+
+/**
+ * A stable, content-derived key for an action item so its done/snoozed state
+ * survives across re-renders (and index shifts within a stored brief).
+ */
+export function itemKey(item: BriefActionItem): string {
+  return [item.threadId ?? "", item.title].join("|");
+}
 
 const BriefSchema = z.object({
   headline: z
@@ -220,13 +233,16 @@ export async function generateDailyBrief(userId: string): Promise<Brief> {
       actionItems,
       events,
       stats,
+      itemStates: {},
     },
+    // Regenerating produces a fresh item set, so clear any prior done/snoozed marks.
     update: {
       headline: object.headline,
       overview: object.overview,
       actionItems,
       events,
       stats,
+      itemStates: {},
     },
   });
 
@@ -237,6 +253,7 @@ export async function generateDailyBrief(userId: string): Promise<Brief> {
     actionItems,
     events,
     stats,
+    itemStates: {},
     createdAt: row.createdAt,
   };
 }
@@ -254,6 +271,34 @@ export async function getTodayBrief(userId: string): Promise<Brief | null> {
     actionItems: row.actionItems as BriefActionItem[],
     events: row.events as BriefEvent[],
     stats: row.stats as BriefStats,
+    itemStates: (row.itemStates as BriefItemStates | null) ?? {},
     createdAt: row.createdAt,
   };
+}
+
+/**
+ * Merge a single action item's interaction state (done / snoozed) into today's
+ * stored brief. No-op if there's no brief yet. Returns the updated map.
+ */
+export async function setBriefItemState(
+  userId: string,
+  key: string,
+  state: BriefItemState | null,
+): Promise<BriefItemStates> {
+  const row = await prisma.dailyBrief.findUnique({
+    where: { userId_date: { userId, date: dateKey() } },
+    select: { itemStates: true },
+  });
+  if (!row) return {};
+  const states = ((row.itemStates as BriefItemStates | null) ?? {}) as BriefItemStates;
+  if (state === null) {
+    delete states[key];
+  } else {
+    states[key] = state;
+  }
+  await prisma.dailyBrief.update({
+    where: { userId_date: { userId, date: dateKey() } },
+    data: { itemStates: states },
+  });
+  return states;
 }

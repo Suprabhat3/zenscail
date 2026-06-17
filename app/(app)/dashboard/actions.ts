@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/session";
-import { generateDailyBrief } from "@/lib/ai/brief";
+import {
+  generateDailyBrief,
+  setBriefItemState,
+  type BriefItemState,
+} from "@/lib/ai/brief";
 
 /**
  * Generate (or regenerate) today's brief for the signed-in user. Used as a
@@ -19,4 +23,18 @@ export async function generateBriefAction(): Promise<{ ok: boolean; error?: stri
     const message = err instanceof Error ? err.message : "Could not generate your brief.";
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Mark a brief action item done, snooze it until a time, or clear its state
+ * (pass null). `key` is the item's stable key from `itemKey()`.
+ */
+export async function setBriefItemStateAction(
+  key: string,
+  state: BriefItemState | null,
+): Promise<{ ok: boolean }> {
+  const session = await requireSession();
+  await setBriefItemState(session.user.id, key, state);
+  revalidatePath("/dashboard");
+  return { ok: true };
 }

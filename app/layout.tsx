@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     siteName: "ZenScail",
     title: TITLE,
     description:
-      "One calm morning brief instead of a hundred unread emails. ZenScail reads your inbox and calendar, drafts replies in your voice, and protects your deep-work time.",
+      "Inbox (3,481). Anxiety (immeasurable). ZenScail reads it all, drafts replies in your voice, guards your deep-work time, and hands you one calm morning brief. You bring the API key; we bring the peace.",
     locale: "en_US",
     images: [
       {
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description:
-      "One calm morning brief instead of a hundred unread emails. Your inbox and calendar, finally at peace.",
+      "Therapy is expensive. Inbox zero is free (BYO API key). ZenScail turns a hundred unread emails into one calm morning brief — and replies in your voice while you touch grass.",
     images: ["/og.webp"],
     creator: "@suprabhat_3",
   },

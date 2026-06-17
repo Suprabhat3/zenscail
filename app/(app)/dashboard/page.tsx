@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
-import { getTodayBrief, type BriefActionItem, type BriefEvent } from "@/lib/ai/brief";
+import { getTodayBrief, type BriefEvent } from "@/lib/ai/brief";
 import { Markdown } from "@/components/chat/Markdown";
 import { GenerateBrief } from "@/components/dashboard/GenerateBrief";
+import { BriefActionItems } from "@/components/dashboard/BriefActionItems";
+import { NextUp } from "@/components/dashboard/NextUp";
 import {
   AskBriefButton,
-  AskItemButton,
   RefreshBriefButton,
 } from "@/components/dashboard/BriefChatButtons";
 
@@ -25,49 +26,6 @@ function fmtTime(iso: string): string {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-const URGENCY: Record<
-  BriefActionItem["urgency"],
-  { label: string; chip: string; bar: string }
-> = {
-  high: { label: "Urgent", chip: "bg-(--accent-soft) text-(--accent-deep)", bar: "bg-(--accent)" },
-  medium: { label: "Today", chip: "bg-[#F7ECD8] text-[#8A5F1E]", bar: "bg-(--gold)" },
-  low: { label: "Soon", chip: "bg-(--bg-deep) text-(--muted)", bar: "bg-(--line)" },
-};
-
-function ActionItem({ item }: { item: BriefActionItem }) {
-  const u = URGENCY[item.urgency] ?? URGENCY.low;
-  return (
-    <li className="group relative flex gap-4 rounded-xl border border-(--line-soft) bg-(--bg) p-4 transition hover:border-(--line) hover:shadow-(--shadow-card)">
-      <span className={`w-1 shrink-0 self-stretch rounded-full ${u.bar}`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-(--ink)">{item.title}</p>
-          <span className={`rounded px-1.5 py-0.5 text-[10.5px] font-bold tracking-wide uppercase ${u.chip}`}>
-            {u.label}
-          </span>
-        </div>
-        <p className="mt-1 text-sm leading-relaxed text-(--ink-soft)">{item.detail}</p>
-        {item.subject && (
-          <p className="mt-1.5 truncate text-xs text-(--muted)">
-            ✉ {item.subject} — {item.from}
-          </p>
-        )}
-        <div className="mt-2.5 flex items-center gap-2">
-          {item.threadId && (
-            <Link
-              href={`/mail/thread/${item.threadId}`}
-              className="rounded-full bg-(--ink) px-3 py-1 text-xs font-semibold text-(--bg) transition hover:bg-(--accent)"
-            >
-              View email →
-            </Link>
-          )}
-          <AskItemButton title={item.title} subject={item.subject} from={item.from} />
-        </div>
-      </div>
-    </li>
-  );
-}
-
 function TodayTimeline({ events }: { events: BriefEvent[] }) {
   if (events.length === 0) {
     return (
@@ -79,10 +37,10 @@ function TodayTimeline({ events }: { events: BriefEvent[] }) {
   return (
     <ol className="space-y-1">
       {events.map((e, i) => (
-        <li key={e.id || i}>
+        <li key={e.id || i} className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition hover:bg-(--bg-deep)">
           <Link
             href={e.id ? `/calendar/event/${e.id}` : "/calendar"}
-            className="flex gap-3 rounded-xl px-3 py-2.5 transition hover:bg-(--bg-deep)"
+            className="flex min-w-0 flex-1 gap-3"
           >
             <span className="w-16 shrink-0 pt-0.5 text-xs font-bold text-(--accent)">
               {e.allDay ? "All day" : fmtTime(e.start)}
@@ -97,6 +55,17 @@ function TodayTimeline({ events }: { events: BriefEvent[] }) {
               </span>
             </span>
           </Link>
+          {e.hangoutLink && (
+            <a
+              href={e.hangoutLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Join video call"
+              className="shrink-0 rounded-full border border-(--line) px-3 py-1 text-xs font-semibold text-(--ink-soft) transition hover:border-(--accent) hover:bg-(--accent-soft) hover:text-(--accent-deep)"
+            >
+              Join
+            </a>
+          )}
         </li>
       ))}
     </ol>
@@ -203,21 +172,14 @@ export default async function DashboardPage() {
                   </svg>
                   What needs you today
                 </h2>
-                {brief.actionItems.length === 0 ? (
-                  <p className="mt-4 text-sm text-(--muted)">
-                    Nothing pressing — enjoy the quiet inbox.
-                  </p>
-                ) : (
-                  <ul className="mt-4 space-y-3">
-                    {brief.actionItems.map((item, i) => (
-                      <ActionItem key={i} item={item} />
-                    ))}
-                  </ul>
-                )}
+                <BriefActionItems items={brief.actionItems} initialStates={brief.itemStates} />
               </section>
             </div>
 
             <div className="space-y-6">
+              {/* Next up — live countdown + join */}
+              <NextUp events={brief.events} />
+
               {/* Today's schedule */}
               <section className="rounded-2xl border border-(--line-soft) bg-(--paper) p-6 shadow-(--shadow-card)">
                 <div className="flex items-baseline justify-between">
@@ -261,7 +223,10 @@ export default async function DashboardPage() {
                 <p className="mt-4 text-xs leading-relaxed text-(--muted)">
                   Brief generated{" "}
                   {brief.createdAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                  . A fresh one arrives every morning at 9:00.
+                  .{" "}
+                  {new Date().getHours() >= 17
+                    ? "Tomorrow’s brief lands at 9:00 — rest easy."
+                    : "A fresh one arrives every morning at 9:00."}
                 </p>
               </section>
             </div>

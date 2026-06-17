@@ -93,21 +93,36 @@ export function verificationEmail(opts: { code: string; name?: string }): {
   html: string;
   text: string;
 } {
-  const spaced = opts.code.split("").join(" ");
+  // One digit per cell — reads like the OTP boxes in the app, and survives
+  // every mail client (no letter-spacing rounding, no font fallback drift).
+  const cells = opts.code
+    .split("")
+    .map(
+      (d) => `
+        <td style="padding:0 5px;">
+          <div style="${sans}width:48px;height:60px;line-height:60px;text-align:center;background:${C.paper};border:1.5px solid ${C.line};border-radius:12px;font-size:30px;font-weight:700;color:${C.accentDeep};box-shadow:inset 0 -2px 0 ${C.bgDeep};">${escapeHtml(d)}</div>
+        </td>`,
+    )
+    .join("");
+
   const body = `
-    <h1 style="${serif}margin:0 0 14px;font-size:26px;font-weight:400;color:${C.ink};">Confirm your email</h1>
-    <p style="${sans}margin:0 0 18px;font-size:15px;line-height:23px;color:${C.inkSoft};">
-      ${greeting(opts.name)} welcome to ZenScail. Enter this code to verify your email and unlock your workspace:
+    <div style="${sans}font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${C.accent};margin:0 0 10px;">Verify it's you</div>
+    <h1 style="${serif}margin:0 0 14px;font-size:27px;font-weight:400;color:${C.ink};">One code stands between<br/>you and a calmer inbox</h1>
+    <p style="${sans}margin:0 0 24px;font-size:15px;line-height:23px;color:${C.inkSoft};">
+      ${greeting(opts.name)} drop this code into ZenScail to confirm your email. Then we'll start quietly taming the chaos for you.
     </p>
-    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 22px;">
+      <tr>${cells}</tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
       <tr>
-        <td style="background:${C.accentSoft};border:1px solid ${C.accent};border-radius:14px;padding:16px 28px;">
-          <span style="${sans}font-size:30px;font-weight:700;letter-spacing:8px;color:${C.accentDeep};">${spaced}</span>
+        <td style="background:${C.bgDeep};border-radius:12px;padding:12px 16px;">
+          <span style="${sans}font-size:13px;line-height:20px;color:${C.inkSoft};">⏳ Expires in <strong style="color:${C.ink};">5 minutes</strong> — about the time it takes to <em>not</em> check your inbox.</span>
         </td>
       </tr>
     </table>
-    <p style="${sans}margin:0 0 6px;font-size:13px;line-height:20px;color:${C.muted};">
-      This code expires in 5 minutes. If you didn't sign up for ZenScail, you can safely ignore this email.
+    <p style="${sans}margin:0;font-size:13px;line-height:20px;color:${C.muted};">
+      Didn't try to sign up? Then someone has great taste and the wrong email — ignore this and nothing happens.
     </p>`;
   return {
     subject: `${opts.code} is your ZenScail verification code`,
@@ -121,17 +136,18 @@ export function onboardingEmail(opts: { name?: string }): {
   html: string;
   text: string;
 } {
-  const features: { title: string; desc: string }[] = [
-    { title: "Connect Gmail & Calendar", desc: "One secure link wires up your inbox and schedule — no setup spreadsheets." },
-    { title: "Triage with AI priority", desc: "Urgent mail floats to the top automatically, so nothing important slips." },
-    { title: "Ask your assistant anything", desc: "“Reply to Sam and book 30 min Thursday” — it drafts, sends, and schedules." },
-    { title: "Fly with the keyboard", desc: "Gmail-style shortcuts (c, r, e, j/k, g i) for mouse-free triage." },
+  const features: { icon: string; title: string; desc: string }[] = [
+    { icon: "🔗", title: "Connect Gmail & Calendar", desc: "One secure link wires up your inbox and schedule — no setup spreadsheets, no IT ticket." },
+    { icon: "🎯", title: "Triage with AI priority", desc: "Urgent mail floats to the top automatically. The newsletters you'll never read? They learn to sit down." },
+    { icon: "✨", title: "Ask your assistant anything", desc: "“Reply to Sam and book 30 min Thursday” — it drafts, sends, and schedules while you sip the coffee." },
+    { icon: "⌨️", title: "Fly with the keyboard", desc: "Gmail-style shortcuts (c, r, e, j/k, g i) for mouse-free triage. Your wrist will thank you." },
   ];
   const list = features
     .map(
       (f) => `
       <tr>
-        <td style="padding:0 0 16px;">
+        <td width="34" valign="top" style="${sans}font-size:18px;line-height:24px;padding:0 0 18px;">${f.icon}</td>
+        <td style="padding:0 0 18px;">
           <div style="${sans}font-size:15px;font-weight:600;color:${C.ink};margin:0 0 2px;">${f.title}</div>
           <div style="${sans}font-size:14px;line-height:21px;color:${C.inkSoft};">${f.desc}</div>
         </td>
@@ -140,21 +156,21 @@ export function onboardingEmail(opts: { name?: string }): {
     .join("");
 
   const body = `
-    <div style="${sans}font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${C.accent};margin:0 0 10px;">Welcome aboard</div>
-    <h1 style="${serif}margin:0 0 14px;font-size:27px;font-weight:400;color:${C.ink};">Your inbox just got calmer</h1>
-    <p style="${sans}margin:0 0 22px;font-size:15px;line-height:23px;color:${C.inkSoft};">
-      ${greeting(opts.name)} you're all set. ZenScail brings your Gmail and Google Calendar into one quiet, AI-assisted workspace. Here's what you can do right now:
+    <div style="${sans}font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${C.accent};margin:0 0 10px;">Welcome aboard 🎉</div>
+    <h1 style="${serif}margin:0 0 14px;font-size:27px;font-weight:400;color:${C.ink};">Your inbox just exhaled</h1>
+    <p style="${sans}margin:0 0 24px;font-size:15px;line-height:23px;color:${C.inkSoft};">
+      ${greeting(opts.name)} you're in. ZenScail folds your Gmail and Google Calendar into one quiet, AI-assisted workspace — the kind of calm you usually have to pay a meditation app for. Here's what's waiting:
     </p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${list}</table>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 6px;">
       <tr>
-        <td style="background:${C.accent};border-radius:999px;">
+        <td style="background:${C.accent};border-radius:999px;box-shadow:0 8px 20px -8px ${C.accent};">
           <a href="${APP_URL}/connect" style="${sans}display:inline-block;padding:13px 30px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Connect your account &rarr;</a>
         </td>
       </tr>
     </table>
-    <p style="${sans}margin:16px 0 0;font-size:13px;line-height:20px;color:${C.muted};">
-      Tip: press <span style="color:${C.ink};font-weight:600;">?</span> anywhere in the app to see every keyboard shortcut.
+    <p style="${sans}margin:18px 0 0;font-size:13px;line-height:20px;color:${C.muted};">
+      Pro tip: press <span style="color:${C.ink};font-weight:600;">?</span> anywhere in the app to summon every keyboard shortcut. Power users only — but we both know that's you.
     </p>`;
   return {
     subject: "Welcome to ZenScail — let's connect your inbox",
