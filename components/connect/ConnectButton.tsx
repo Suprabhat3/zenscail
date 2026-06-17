@@ -8,6 +8,7 @@ export function ConnectButton({ allConnected }: { allConnected: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => router.refresh(), [router]);
@@ -15,6 +16,18 @@ export function ConnectButton({ allConnected }: { allConnected: boolean }) {
   useEffect(() => {
     if (allConnected) setPending(false);
   }, [allConnected]);
+
+  // The connection happens in the Corsair tab, so this page can't know it
+  // succeeded until it re-probes. Auto-polling only runs while `pending`; this
+  // gives the user an explicit, always-available way to re-check after they
+  // return — with a brief spinner so the action feels acknowledged.
+  async function handleCheck() {
+    setChecking(true);
+    refresh();
+    // router.refresh() resolves before the server component re-renders, so hold
+    // the spinner briefly for feedback; the new status arrives via props.
+    setTimeout(() => setChecking(false), 1200);
+  }
 
   useEffect(() => {
     if (!pending) return;
@@ -73,6 +86,38 @@ export function ConnectButton({ allConnected }: { allConnected: boolean }) {
             ? "Reconnect accounts"
             : "Connect with Corsair"}
       </button>
+
+      {!allConnected && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={handleCheck}
+            disabled={checking}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-(--line) bg-(--paper) px-4 py-3 text-sm font-semibold text-(--ink) transition hover:border-(--accent) hover:text-(--accent-deep) disabled:opacity-60"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className={checking ? "animate-spin" : undefined}
+            >
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            {checking ? "Checking…" : "Already connected? Refresh status"}
+          </button>
+          <p className="mt-2 text-center text-xs text-(--muted)">
+            Authorized Gmail &amp; Calendar in the other tab? Come back and tap
+            refresh — your status updates here.
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="mt-3 text-center text-xs text-(--accent-deep)">{error}</p>
