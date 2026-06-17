@@ -6,6 +6,7 @@ import { CLOUD_PLAN } from "@/lib/plan";
 import {
   startCloudSubscription,
   verifyCloudSubscription,
+  switchToByok,
 } from "@/app/onboarding/actions";
 
 type RazorpayHandlerResponse = {
@@ -44,10 +45,14 @@ function loadCheckoutScript(): Promise<boolean> {
 
 export function SubscribeStep({
   configured,
+  reactivate = false,
   userName,
   userEmail,
 }: {
   configured: boolean;
+  /** User is already onboarded on Cloud but lapsed — they're pinned to this step
+   *  by the gate, so "use my own key" must switch tiers rather than navigate. */
+  reactivate?: boolean;
   userName?: string;
   userEmail?: string;
 }) {
@@ -149,13 +154,26 @@ export function SubscribeStep({
           </button>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() => router.push("/onboarding?step=ai")}
-          className="mt-3 w-full rounded-full border border-(--line) bg-(--paper) px-4 py-3 text-sm font-semibold text-(--ink) transition hover:border-(--ink)"
-        >
-          ← Use my own API key instead
-        </button>
+        {reactivate ? (
+          // Onboarded already — navigating to ?step=ai is overridden back to this
+          // step, so switch the tier server-side to actually leave Cloud.
+          <form action={switchToByok}>
+            <button
+              type="submit"
+              className="mt-3 w-full rounded-full border border-(--line) bg-(--paper) px-4 py-3 text-sm font-semibold text-(--ink) transition hover:border-(--ink)"
+            >
+              ← Use my own API key instead
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => router.push("/onboarding?step=ai")}
+            className="mt-3 w-full rounded-full border border-(--line) bg-(--paper) px-4 py-3 text-sm font-semibold text-(--ink) transition hover:border-(--ink)"
+          >
+            ← Use my own API key instead
+          </button>
+        )}
 
         {error && (
           <p className="mt-3 text-center text-xs text-(--accent-deep)">{error}</p>

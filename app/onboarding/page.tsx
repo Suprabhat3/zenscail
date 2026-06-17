@@ -108,6 +108,7 @@ export default async function OnboardingPage({
       {current === "subscribe" && (
         <SubscribeStep
           configured={razorpayConfigured()}
+          reactivate={reactivate}
           userName={user?.name ?? undefined}
           userEmail={user?.email ?? undefined}
         />

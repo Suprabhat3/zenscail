@@ -203,7 +203,7 @@ export function AiSettingsForm({
           )}
 
           <button className="rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)">
-            Save settings
+            {tier === "cloud" && !cloudActive ? "Continue to billing →" : "Save settings"}
           </button>
         </form>
       </div>

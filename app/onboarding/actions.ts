@@ -61,6 +61,30 @@ export async function finishByok(formData: FormData) {
 }
 
 /**
+ * Switch a (re)activating Cloud user back to BYOK from the subscribe step.
+ *
+ * A reactivating user is `tier="cloud"` without an active subscription, so the
+ * app gate and the onboarding page both pin them to the subscribe step — they
+ * can't simply navigate to `?step=ai`. Flipping the tier here lifts that gate.
+ * If they already have a stored key (e.g. they switched BYOK→Cloud and changed
+ * their mind) they're ready to go; otherwise send them to AI settings to add one.
+ */
+export async function switchToByok() {
+  const session = await requireSession();
+
+  const settings = await prisma.userAiSettings.upsert({
+    where: { userId: session.user.id },
+    create: { userId: session.user.id, tier: "byok" },
+    update: { tier: "byok" },
+  });
+
+  // Reactivating users are already onboarded, so flipping the tier is enough to
+  // lift the Cloud gate. If they have a stored key they're ready; otherwise send
+  // them to AI settings to add one.
+  redirect(settings.encryptedApiKey ? "/dashboard" : "/settings/ai");
+}
+
+/**
  * Create a Razorpay subscription for the Cloud plan and persist it as `created`.
  * Returns the ids the browser needs to open Checkout. Onboarding is NOT marked
  * complete here — only after the payment is verified.

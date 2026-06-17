@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { generateText } from "ai";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { modelInstance } from "@/lib/ai/registry";
 import { isValidModel, type AiProvider } from "@/lib/ai/models";
@@ -23,6 +24,15 @@ export async function saveAiSettings(formData: FormData) {
   const tier = String(formData.get("tier") ?? "cloud") === "byok" ? "byok" : "cloud";
 
   if (tier === "cloud") {
+    // Only commit the Cloud tier for users who actually have an active
+    // subscription — otherwise a BYOK user who merely *selects* Cloud to look
+    // around would flip to a tier they haven't paid for and get locked out of
+    // the app (every page bounces a lapsed-Cloud user to the subscribe step).
+    // The tier flips to "cloud" after payment is verified; until then, send
+    // them to billing to subscribe and leave their working BYOK setup intact.
+    if (!(await hasActiveSubscription(session.user.id))) {
+      redirect("/settings/billing");
+    }
     await prisma.userAiSettings.upsert({
       where: { userId: session.user.id },
       create: { userId: session.user.id, tier },
