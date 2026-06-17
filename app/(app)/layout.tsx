@@ -6,6 +6,7 @@ import { isActiveStatus } from "@/lib/subscription";
 import { getChatModelOptions } from "@/lib/ai/registry";
 import { getAppIdentityForUser } from "@/lib/identity";
 import { AppNav } from "@/components/app/AppNav";
+import { MobileTabBar } from "@/components/app/MobileTabBar";
 import { UserMenu } from "@/components/app/UserMenu";
 import { PlanBadge } from "@/components/app/PlanBadge";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
@@ -68,10 +69,10 @@ export default async function AppLayout({
       <CommandProvider>
       <ToastProvider>
       <div className="flex min-h-screen flex-col bg-(--bg) text-(--ink)">
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-(--line-soft) bg-(--bg)/85 px-6 py-3 backdrop-blur">
+        <header className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-(--line-soft) bg-(--bg)/85 px-4 py-3 backdrop-blur sm:px-6">
           <AppNav />
           <QuickAddBar />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <PlanBadge plan={plan} />
             <ChatLauncher />
             <UserMenu
@@ -83,7 +84,7 @@ export default async function AppLayout({
           </div>
         </header>
         {identity.mismatch && (
-          <div className="border-b border-(--gold)/30 bg-[#FBF3E3] px-6 py-2 text-center text-xs text-[#7A5414]">
+          <div className="border-b border-(--gold)/30 bg-[#FBF3E3] px-4 py-2 text-center text-xs text-[#7A5414] sm:px-6">
             Managing the{" "}
             <span className="font-semibold">{identity.connectedEmail}</span>{" "}
             mailbox — signed in as {identity.loginEmail}.{" "}
@@ -92,7 +93,8 @@ export default async function AppLayout({
             </Link>
           </div>
         )}
-        <main className="flex-1">{children}</main>
+        <main className="zs-app-main flex-1">{children}</main>
+        <MobileTabBar />
         <KeyboardShortcuts />
         <SnoozeHotkeyBridge />
         <CommandPalette />

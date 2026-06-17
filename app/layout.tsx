@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 
@@ -71,10 +71,24 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  appleWebApp: {
+    capable: true,
+    title: "ZenScail",
+    statusBarStyle: "default",
+  },
   robots: {
     index: true,
     follow: true,
   },
+};
+
+export const viewport: Viewport = {
+  // Fill the screen edge-to-edge on notched phones; our safe-area padding
+  // (see globals.css) keeps content clear of the notch and home indicator.
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#FAF5EC",
 };
 
 export default function RootLayout({

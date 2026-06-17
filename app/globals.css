@@ -1597,3 +1597,22 @@ section[data-screen-label] { position: relative; }
   .zs-orbit { opacity: 0.5; }
   .zs-track::after { animation: none; opacity: 0.6; }
 }
+
+/* ============================================================
+   Mobile / PWA helpers — unlayered so they win over utilities.
+   ============================================================ */
+
+/* Hide scrollbars on horizontal scroll rows (settings tabs, calendar
+   controls) while keeping them swipeable on touch. */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Bottom tab bar: lift content above the iOS home indicator. */
+.zs-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Reserve room for the fixed mobile tab bar (56px) + the home indicator so
+   page content is never hidden behind it. Cleared at md: where the bar hides. */
+.zs-app-main { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) {
+  .zs-app-main { padding-bottom: 0; }
+}

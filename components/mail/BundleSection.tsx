@@ -36,7 +36,11 @@ export function BundleSection({
   const ready = useRef(false);
 
   useEffect(() => {
+    // Restore the remembered collapse state from localStorage. This must run
+    // after mount (not a useState initializer) so SSR and first client render
+    // agree on `defaultOpen` — the post-hydration update is intentional.
     const raw = window.localStorage.getItem(storageKey);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage (external store) on mount
     if (raw != null) setOpen(raw === "1");
     ready.current = true;
   }, [storageKey]);
@@ -80,9 +84,9 @@ export function BundleSection({
           >
             <path d="m9 18 6-6-6-6" />
           </svg>
-          <span aria-hidden>{emoji}</span>
-          <span className="text-sm font-semibold text-(--ink)">{title}</span>
-          <span className="text-xs text-(--muted)">
+          <span aria-hidden className="shrink-0">{emoji}</span>
+          <span className="truncate text-sm font-semibold text-(--ink)">{title}</span>
+          <span className="shrink-0 text-xs whitespace-nowrap text-(--muted)">
             {ids.length}
             {unread > 0 && <span className="text-(--accent)"> · {unread} unread</span>}
           </span>
@@ -93,18 +97,29 @@ export function BundleSection({
               type="button"
               disabled={pending}
               onClick={() => run("read", "Marked all read")}
-              className="rounded-full px-2.5 py-1 text-xs font-medium text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink) disabled:opacity-50"
+              title="Mark all read"
+              aria-label="Mark all read"
+              className="flex items-center gap-1.5 rounded-full p-1.5 text-xs font-medium text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink) disabled:opacity-50 sm:px-2.5 sm:py-1"
             >
-              Mark all read
+              <svg className="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m3 12 5 5L20 5" />
+              </svg>
+              <span className="hidden sm:inline">Mark all read</span>
             </button>
           )}
           <button
             type="button"
             disabled={pending}
             onClick={() => run("archive", "Bundle archived")}
-            className="rounded-full px-2.5 py-1 text-xs font-medium text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink) disabled:opacity-50"
+            title="Archive all"
+            aria-label="Archive all"
+            className="flex items-center gap-1.5 rounded-full p-1.5 text-xs font-medium text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink) disabled:opacity-50 sm:px-2.5 sm:py-1"
           >
-            Archive all
+            <svg className="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="4" width="18" height="4" rx="1" />
+              <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+            </svg>
+            <span className="hidden sm:inline">Archive all</span>
           </button>
         </div>
       </div>

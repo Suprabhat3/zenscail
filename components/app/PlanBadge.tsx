@@ -10,7 +10,7 @@ export function PlanBadge({ plan }: { plan: "cloud" | "byok" }) {
       <Link
         href="/settings/billing"
         title="ZenScail Cloud — manage billing"
-        className="inline-flex items-center gap-1.5 rounded-full border border-(--accent)/30 bg-(--accent-soft) px-3 py-1 text-xs font-semibold text-(--accent-deep) transition hover:border-(--accent)/60"
+        className="hidden items-center gap-1.5 rounded-full border border-(--accent)/30 bg-(--accent-soft) px-3 py-1 text-xs font-semibold text-(--accent-deep) transition hover:border-(--accent)/60 sm:inline-flex"
       >
         <span aria-hidden="true">✦</span>
         Cloud
@@ -21,7 +21,7 @@ export function PlanBadge({ plan }: { plan: "cloud" | "byok" }) {
     <Link
       href="/settings/billing"
       title="Using your own API key — manage billing"
-      className="inline-flex items-center gap-1.5 rounded-full border border-(--line) px-3 py-1 text-xs font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+      className="hidden items-center gap-1.5 rounded-full border border-(--line) px-3 py-1 text-xs font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink) sm:inline-flex"
     >
       Your key
     </Link>

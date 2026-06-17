@@ -20,7 +20,7 @@ export default async function ComposePage({
   const me = identity.primaryEmail;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
       <Link href="/mail" className="text-sm text-(--muted) transition hover:text-(--ink)">
         ← Back to inbox
       </Link>

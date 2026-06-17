@@ -27,7 +27,7 @@ export default async function ConnectPage() {
 
   if (!process.env.CORSAIR_DEV_KEY || !process.env.CORSAIR_INSTANCE_ID) {
     return (
-      <div className="mx-auto max-w-lg px-6 py-16">
+      <div className="mx-auto max-w-lg px-4 py-12 sm:px-6 sm:py-16">
         <h1 className="font-serif text-2xl font-normal text-(--ink)">Corsair not configured</h1>
         <p className="mt-3 text-sm text-(--muted)">
           Set <code className="rounded bg-(--bg-deep) px-1 py-0.5 text-xs">CORSAIR_DEV_KEY</code> in{" "}

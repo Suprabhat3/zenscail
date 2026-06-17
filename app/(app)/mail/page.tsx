@@ -7,7 +7,7 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
 import { listInboxMessages, getThread, header, getLabelData } from "@/lib/gmail";
-import { MailSidebar } from "@/components/mail/MailSidebar";
+import { MailSidebar, MailFolderChips } from "@/components/mail/MailSidebar";
 import {
   classifyMessages,
   getPriorities,
@@ -257,17 +257,17 @@ export default async function MailPage({
         }`;
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-6 px-6 py-8">
+    <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <MailSidebar custom={labelData.custom} unread={labelData.unread} />
       <div className="min-w-0 flex-1">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="font-serif text-3xl text-(--ink)">{pageTitle}</h1>
+          <h1 className="font-serif text-2xl text-(--ink) sm:text-3xl">{pageTitle}</h1>
           <p className="mt-0.5 text-sm text-(--muted)">{subtitle}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <form action="/mail" className="relative">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <form action="/mail" className="relative min-w-0 flex-1 sm:flex-none">
             <svg
               className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-(--muted)"
               width="14"
@@ -287,7 +287,7 @@ export default async function MailPage({
               name="q"
               defaultValue={unreadView ? "" : q}
               placeholder="Search mail…"
-              className="w-56 rounded-full border border-(--line) bg-(--paper) py-2 pr-4 pl-9 text-sm text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
+              className="w-full rounded-full border border-(--line) bg-(--paper) py-2 pr-4 pl-9 text-sm text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft) sm:w-56"
             />
           </form>
           <form action={refreshInbox}>
@@ -313,8 +313,11 @@ export default async function MailPage({
         </div>
       </div>
 
+      {/* Folder switcher (mobile only — replaces the hidden sidebar) */}
+      <MailFolderChips custom={labelData.custom} unread={labelData.unread} />
+
       {/* Filter tabs */}
-      <div className="mt-5 flex items-center gap-1 border-b border-(--line-soft)">
+      <div className="no-scrollbar mt-5 flex items-center gap-1 overflow-x-auto border-b border-(--line-soft)">
         {inboxContext &&
           tabs.map((tab) => (
             <Link

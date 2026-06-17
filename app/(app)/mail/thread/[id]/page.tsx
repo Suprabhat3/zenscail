@@ -124,7 +124,7 @@ export default async function ThreadPage({
 
   if (messages.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-24 text-center">
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
         <p className="font-serif text-2xl text-(--ink)">This conversation is empty</p>
         <p className="mt-2 text-sm text-(--muted)">
           It may have been deleted or moved outside your inbox.
@@ -152,7 +152,7 @@ export default async function ThreadPage({
   );
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <Link
         href="/mail"
         className="inline-flex items-center gap-1.5 text-sm text-(--muted) transition hover:text-(--ink)"
@@ -230,7 +230,7 @@ export default async function ThreadPage({
             name="to"
             defaultValue={replyTo}
             required
-            className="mt-1.5 w-full rounded-full border border-(--line) bg-(--bg) px-4 py-2.5 text-sm text-(--ink) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
+            className="mt-1.5 w-full rounded-xl border border-(--line) bg-(--bg) px-4 py-2.5 text-sm text-(--ink) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
           />
         </label>
         <textarea
@@ -241,8 +241,8 @@ export default async function ThreadPage({
           placeholder="Write your reply…"
           className="mt-3 w-full resize-y rounded-xl border border-(--line) bg-(--bg) px-4 py-3 text-sm leading-relaxed text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
         />
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-(--muted)">Sends from your connected Gmail · Undo for a few seconds.</p>
+        <div className="mt-3 flex items-center justify-end gap-3 sm:justify-between">
+          <p className="hidden text-xs text-(--muted) sm:block">Sends from your connected Gmail · Undo for a few seconds.</p>
           <SendBar successHref={`/mail/thread/${thread.id ?? id}`} label="Send reply" />
         </div>
       </form>

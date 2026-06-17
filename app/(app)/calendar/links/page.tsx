@@ -25,7 +25,7 @@ export default async function BookingLinksPage() {
   });
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
       <Link href="/calendar" className="text-sm text-(--muted) transition hover:text-(--ink)">
         ← Back to calendar
       </Link>

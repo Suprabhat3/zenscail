@@ -223,3 +223,76 @@ export function MailSidebar({
     </aside>
   );
 }
+
+/**
+ * Mobile-only folder switcher: the sidebar's folders/labels as a single
+ * horizontally-scrollable chip row. Replaces the hidden sidebar below md:.
+ */
+export function MailFolderChips({
+  custom,
+  unread,
+}: {
+  custom: GmailLabel[];
+  unread: Record<string, number>;
+}) {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const view = params.get("view");
+  const folder = params.get("folder");
+  const activeLabel = params.get("label");
+  const q = params.get("q");
+
+  let active = "";
+  if (pathname === "/mail") {
+    if (view === "snoozed") active = "snoozed";
+    else if (view === "scheduled") active = "scheduled";
+    else if (folder) active = folder;
+    else if (!q) active = "inbox";
+  }
+
+  return (
+    <div className="no-scrollbar -mx-4 mt-4 flex gap-1.5 overflow-x-auto px-4 md:hidden">
+      {FOLDERS.map((f) => {
+        const isActive = !activeLabel && active === f.match;
+        const count = f.countLabel ? unread[f.countLabel] ?? 0 : 0;
+        return (
+          <Link
+            key={f.match}
+            href={f.href}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+              isActive
+                ? "border-transparent bg-(--accent-soft) text-(--accent-deep)"
+                : "border-(--line) bg-(--paper) text-(--ink-soft)"
+            }`}
+          >
+            <span className={isActive ? "text-(--accent)" : "text-(--muted)"}>
+              <Icon name={f.icon} />
+            </span>
+            {f.label}
+            {count > 0 && <span className="text-xs font-semibold tabular-nums">{count}</span>}
+          </Link>
+        );
+      })}
+      {custom.map((l) => {
+        const isActive = activeLabel === l.id;
+        return (
+          <Link
+            key={l.id}
+            href={`/mail?label=${encodeURIComponent(l.id)}`}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+              isActive
+                ? "border-transparent bg-(--accent-soft) text-(--accent-deep)"
+                : "border-(--line) bg-(--paper) text-(--ink-soft)"
+            }`}
+          >
+            <span className={isActive ? "text-(--accent)" : "text-(--muted)"}>
+              <Icon name="label" />
+            </span>
+            {l.name}
+            {l.unread > 0 && <span className="text-xs font-semibold tabular-nums">{l.unread}</span>}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}

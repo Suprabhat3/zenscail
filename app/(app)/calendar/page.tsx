@@ -202,13 +202,13 @@ export default async function CalendarPage({
         : rangeStart.toLocaleDateString([], { month: "long", year: "numeric" });
 
   return (
-    <div className="mx-auto flex max-w-7xl gap-6 px-6 py-8">
+    <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <CalendarSidebar calendars={calendars} />
       <div className="min-w-0 flex-1">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-baseline gap-3">
-            <h1 className="font-serif text-3xl text-(--ink)">Calendar</h1>
+            <h1 className="font-serif text-2xl text-(--ink) sm:text-3xl">Calendar</h1>
             <span className="text-sm font-medium text-(--muted)">{title}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -497,7 +497,7 @@ function MonthView({
           return (
             <div
               key={i}
-              className={`min-h-26 border-t border-l border-(--line-soft) p-1.5 ${
+              className={`min-h-20 border-t border-l border-(--line-soft) p-1 sm:min-h-26 sm:p-1.5 ${
                 i % 7 === 0 ? "border-l-0" : ""
               } ${inMonth ? "" : "bg-(--bg)/40"}`}
             >
