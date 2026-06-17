@@ -36,10 +36,20 @@ function layout(opts: { preheader: string; body: string }): string {
     <meta name="color-scheme" content="light" />
     <meta name="supported-color-schemes" content="light" />
     <title>ZenScail</title>
+    <style>
+      /* Mobile clients that honor <style> (Apple Mail, Gmail app, Outlook app):
+         tighten the generous desktop padding so copy isn't squeezed into a
+         2–3-word column on a phone. Inline styles are the desktop fallback. */
+      @media only screen and (max-width: 600px) {
+        .zs-outer { padding: 24px 10px !important; }
+        .zs-card { padding: 26px 20px !important; border-radius: 16px !important; }
+        .zs-footer { padding: 18px 4px 0 !important; }
+      }
+    </style>
   </head>
   <body style="margin:0;padding:0;background:${C.bg};">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.bg};font-size:1px;line-height:1px;">${opts.preheader}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};padding:40px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="zs-outer" style="background:${C.bg};padding:40px 16px;">
       <tr>
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
@@ -53,13 +63,13 @@ function layout(opts: { preheader: string; body: string }): string {
             </tr>
             <!-- Card -->
             <tr>
-              <td style="background:${C.paper};border:1px solid ${C.line};border-radius:20px;padding:40px 36px;box-shadow:0 12px 32px -16px rgba(37,32,26,0.25);">
+              <td class="zs-card" style="background:${C.paper};border:1px solid ${C.line};border-radius:20px;padding:36px 32px;box-shadow:0 12px 32px -16px rgba(37,32,26,0.25);">
                 ${opts.body}
               </td>
             </tr>
             <!-- Footer -->
             <tr>
-              <td style="padding:24px 8px 0;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:${C.muted};">
+              <td class="zs-footer" style="padding:24px 8px 0;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:${C.muted};">
                 ZenScail — a calmer inbox, an AI that works while you don't.<br />
                 You're receiving this because you created a ZenScail account.
               </td>

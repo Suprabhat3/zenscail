@@ -22,27 +22,14 @@ export function Nav() {
         <a className="logo" href="/">
           <Image src="/logo.png" alt="ZenScail" width={33} height={30} priority />
           <span>ZenScail</span>
-          <span
-            style={{
-              padding: "2px 8px",
-              borderRadius: 99,
-              background: "var(--accent-soft)",
-              color: "var(--accent-deep)",
-              fontFamily: "var(--font-body)",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-            }}
-          >
-            BETA
-          </span>
+          <span className="nav-beta">BETA</span>
         </a>
         <div className="nav-links">
           <a href="/#features">Features</a>
           <a href="/#demo">See it work</a>
           <a href="/#pricing">Pricing</a>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div className="nav-actions">
           {session ? (
             <Link className="btn btn-primary btn-sm" href="/dashboard">
               Open app →

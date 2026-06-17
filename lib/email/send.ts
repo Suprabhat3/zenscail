@@ -106,9 +106,13 @@ export async function sendActivatedOnce(user: {
   try {
     const row = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { activatedAt: true },
+      select: { activatedAt: true, onboardedAt: true },
     });
-    if (row?.activatedAt) return;
+    // Only the genuine finale: never before onboarding is actually finished
+    // (finishByok / verifyCloudSubscription set `onboardedAt`). Without this,
+    // landing on the dashboard mid-onboarding fires it alongside the welcome
+    // email. And never twice.
+    if (!row?.onboardedAt || row.activatedAt) return;
     await prisma.user.update({
       where: { id: user.id },
       data: { activatedAt: new Date() },
