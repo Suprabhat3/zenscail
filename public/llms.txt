@@ -1,0 +1,42 @@
+# ZenScail
+
+> ZenScail is an AI-native email and calendar workspace. It reads your Gmail inbox and Google Calendar, then hands you one calm daily brief — what matters, what can wait, and what's already handled. It drafts replies in your voice, triages mail by priority, and runs your schedule through a natural-language agent. Free forever when you bring your own AI API key.
+
+ZenScail connects to Gmail and Google Calendar (via Corsair) and layers AI on top to remove inbox and scheduling busywork. Core ideas: a priority inbox that surfaces only what's urgent, a once-a-day AI brief of your mail and meetings, instant AI reply drafts, and a chat agent that can compose email, create calendar events, and invite attendees from a single natural-language instruction.
+
+## Key features
+
+- **AI priority inbox**: every email is classified urgent / normal / low with a one-line reason; an "Urgent first" toggle floats what can't wait to the top.
+- **Daily AI brief**: a once-a-day digest of inbox + calendar — headline, action items deep-linked to the source email, and the day's meetings.
+- **AI reply chips & drafting**: one-tap, context-aware reply suggestions and full drafts written in your voice; never auto-sent.
+- **Natural-language agent**: chat or a quick-add bar that creates events, composes and sends mail, and resolves relative dates ("next Thursday at 9").
+- **Smart inbox bundles**: the flat inbox splits into Important, Newsletters, Social, Notifications, and Everything else, with batch actions.
+- **Snooze, Send Later, Undo Send**: move threads out of the inbox until later, schedule mail, and retract a just-sent email within a short window.
+- **Follow-up reminders**: "remind me if no reply" resurfaces threads that went silent, with an AI-drafted nudge.
+- **Scheduling links**: share a Calendly-style booking link from your real free/busy; guests pick a slot and the event lands on your calendar.
+- **Keyboard-first triage**: shortcuts and a command palette (Ctrl/Cmd-K) to navigate, act, and search without leaving the keyboard.
+- **Bring your own key**: use OpenAI, Anthropic, Google, or Groq with any model on the free tier; keys are encrypted at rest.
+
+## Who it's for
+
+People who live in Gmail and Google Calendar and want less inbox anxiety: founders, operators, freelancers, and busy professionals who need to triage high email volume quickly and protect focus time.
+
+## Pages
+
+- [Home](https://zenscail.com): product overview, live interactive preview, and pricing.
+- [About](https://zenscail.com/about): what ZenScail is and the philosophy behind it.
+- [Founder](https://zenscail.com/founder): the story and person behind ZenScail.
+- [Contact](https://zenscail.com/contact): how to get in touch.
+- [Security](https://zenscail.com/security): data handling, encryption, and OAuth scopes.
+- [Privacy Policy](https://zenscail.com/privacy): how user data is collected and used.
+- [Terms of Service](https://zenscail.com/terms): terms, billing, cancellation, and refunds.
+- [Cookie Policy](https://zenscail.com/cookies): cookie usage.
+
+## Pricing
+
+Free forever when you bring your own AI API key (OpenAI, Anthropic, Google, or Groq). An optional built-in cloud AI tier is available as a paid subscription for users who prefer not to manage their own key.
+
+## Notes
+
+- ZenScail is a web application; the core mail, calendar, dashboard, and chat experiences live behind sign-in and are not part of the public crawlable surface.
+- Built on Corsair for Gmail and Google Calendar access; all data access is OAuth-scoped per user.
