@@ -24,6 +24,7 @@ import { CancelSendButton } from "@/components/mail/CancelSendButton";
 import { BundleSection } from "@/components/mail/BundleSection";
 import { LayoutToggle } from "@/components/mail/LayoutToggle";
 import { FollowUpBanner } from "@/components/mail/FollowUpBanner";
+import { LocalDraftsList, type LocalDraft } from "@/components/mail/LocalDraftsList";
 import { refreshInbox, trashMessageAction, archiveMessageAction } from "./actions";
 import { catchUpSchedules } from "./schedule-actions";
 import { processDueFollowUps, listSurfacedFollowUps } from "@/lib/followUp";
@@ -188,6 +189,29 @@ export default async function MailPage({
       orderBy: { sendAt: "asc" },
       take: 50,
       select: { id: true, to: true, subject: true, sendAt: true, status: true, isUndo: true, error: true },
+    });
+  }
+
+  // --- Local (DB-backed) drafts, shown atop the Drafts folder ---
+  let localDrafts: LocalDraft[] = [];
+  if (folderKey === "drafts" && !q) {
+    const rows = await prisma.draft.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+    });
+    localDrafts = rows.map((d) => {
+      const text = d.isHtml
+        ? d.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+        : d.body;
+      return {
+        id: d.id,
+        to: d.to,
+        subject: d.subject,
+        preview: text.slice(0, 120),
+        isHtml: d.isHtml,
+        updatedAt: formatWhen(d.updatedAt),
+      };
     });
   }
 
@@ -359,12 +383,16 @@ export default async function MailPage({
         />
       )}
 
+      {/* Local drafts saved on ZenScail (Drafts folder only) */}
+      {folderKey === "drafts" && <LocalDraftsList drafts={localDrafts} />}
+
       {/* Body */}
       {snoozedView ? (
         <SnoozedList snoozed={snoozed} formatWhen={formatWhen} />
       ) : scheduledView ? (
         <ScheduledList scheduled={scheduled} formatWhen={formatWhen} />
       ) : messages.length === 0 ? (
+        folderKey === "drafts" && localDrafts.length > 0 ? null : (
         <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) px-4 py-20 text-center shadow-(--shadow-card)">
           <svg className="mx-auto text-(--line)" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -381,6 +409,7 @@ export default async function MailPage({
             {q ? "Try a different search." : "Hit Refresh to sync your inbox."}
           </p>
         </div>
+        )
       ) : bundled ? (
         <>
           <div className="mt-4 space-y-3">

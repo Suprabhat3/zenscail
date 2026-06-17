@@ -13,6 +13,7 @@ const toc = [
   { id: "encryption", title: "Encryption" },
   { id: "access", title: "Access & permissions" },
   { id: "keys", title: "Protecting your AI keys" },
+  { id: "payments", title: "Payment security" },
   { id: "infrastructure", title: "Infrastructure" },
   { id: "data-minimization", title: "Data minimisation" },
   { id: "authentication", title: "Authentication" },
@@ -26,7 +27,7 @@ export default function SecurityPage() {
       eyebrow="Trust"
       title="Security at ZenScail"
       intro="You’re handing us the keys to your inbox and calendar. We treat that access as a responsibility, not a convenience. Here’s how we keep it safe."
-      updated="June 13, 2026"
+      updated="June 17, 2026"
       toc={toc}
       contact={{
         heading: "Found a vulnerability?",
@@ -79,6 +80,19 @@ export default function SecurityPage() {
           logs or shown back to you in full. We don&rsquo;t use your content or prompts to
           train any model. See our <a href="/privacy">Privacy Policy</a> for the full data
           commitments.
+        </p>
+      </section>
+
+      <section id="payments" className="doc-section">
+        <h2>Payment security</h2>
+        <p>
+          Payments for ZenScail Cloud are handled entirely by{" "}
+          <strong>Razorpay</strong>, a PCI-DSS-compliant payment processor. Card and bank
+          details are entered directly with Razorpay and never pass through or rest on
+          ZenScail&rsquo;s servers — <strong>we never see or store your full payment
+          credentials.</strong> We retain only a subscription reference and status so we can
+          manage your access. See our <a href="/terms">Terms</a> for how billing,
+          cancellation, and refunds work.
         </p>
       </section>
 

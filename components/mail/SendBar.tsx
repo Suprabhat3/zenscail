@@ -8,6 +8,7 @@ import {
   cancelScheduledSend,
   flushScheduledSend,
 } from "@/app/(app)/mail/schedule-actions";
+import { deleteDraft } from "@/app/(app)/mail/draft-actions";
 import { useToast } from "@/components/ui/Toast";
 import { sendLaterPresets, fmtDateTime, localInputToIso } from "@/lib/timePresets";
 
@@ -25,6 +26,7 @@ type Payload = {
   cc?: string;
   subject: string;
   body: string;
+  isHtml?: boolean;
   threadId?: string;
   inReplyTo?: string;
 };
@@ -49,6 +51,9 @@ export function SendBar({
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [custom, setCustom] = useState("");
+  // Draft id of the compose form, captured at read time so we can delete the
+  // saved draft once the mail actually flushes.
+  const draftIdRef = useRef("");
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -78,14 +83,22 @@ export function SendBar({
       toast("Write a message first");
       return null;
     }
+    draftIdRef.current = String(fd.get("draftId") ?? "");
     return {
       to,
       cc: String(fd.get("cc") ?? "") || undefined,
       subject: String(fd.get("subject") ?? ""),
       body,
+      isHtml: String(fd.get("isHtml") ?? "") === "1",
       threadId: String(fd.get("threadId") ?? "") || undefined,
       inReplyTo: String(fd.get("inReplyTo") ?? "") || undefined,
     };
+  }
+
+  /** Remove the saved draft once a send has actually gone out. Best-effort. */
+  async function dropDraft() {
+    const id = draftIdRef.current;
+    if (id) await deleteDraft(id).catch(() => {});
   }
 
   async function onSend() {
@@ -98,6 +111,7 @@ export function SendBar({
         // Undo disabled — send immediately.
         const { id } = await deferSend(payload, 0);
         await flushScheduledSend(id);
+        await dropDraft();
         toast("Sent");
         router.push(successHref);
         router.refresh();
@@ -120,6 +134,7 @@ export function SendBar({
         onExpire: async () => {
           if (undone) return;
           await flushScheduledSend(id).catch(() => {});
+          await dropDraft();
           router.push(successHref);
           router.refresh();
         },
@@ -137,6 +152,7 @@ export function SendBar({
     setBusy(true);
     try {
       await scheduleSend(payload, date.toISOString());
+      await dropDraft();
       toast(`Scheduled for ${fmtDateTime(date)}`);
       router.push("/mail?view=scheduled");
       router.refresh();

@@ -60,6 +60,7 @@ type SendPayload = {
   cc?: string;
   subject: string;
   body: string;
+  isHtml?: boolean;
   threadId?: string;
   inReplyTo?: string;
 };
@@ -74,6 +75,7 @@ function validate(p: SendPayload): SendPayload {
     cc: p.cc?.trim() || undefined,
     subject: p.subject?.trim() ?? "",
     body,
+    isHtml: Boolean(p.isHtml),
     threadId: p.threadId?.trim() || undefined,
     inReplyTo: p.inReplyTo?.trim() || undefined,
   };
@@ -105,6 +107,7 @@ export async function deferSend(
       cc: data.cc,
       subject: data.subject,
       body: data.body,
+      isHtml: data.isHtml ?? false,
       threadId: data.threadId,
       inReplyTo: data.inReplyTo,
       sendAt: new Date(Date.now() + secs * 1000),
@@ -133,6 +136,7 @@ export async function scheduleSend(
       cc: data.cc,
       subject: data.subject,
       body: data.body,
+      isHtml: data.isHtml ?? false,
       threadId: data.threadId,
       inReplyTo: data.inReplyTo,
       sendAt,

@@ -237,14 +237,24 @@ function actionTools(userId: string, onDirective?: (d: AgentDirective) => void) 
           .string()
           .describe("Recipient — an email address, or the person's name (it will be resolved to an address from recent contacts)."),
         subject: z.string().describe("Email subject line."),
-        body: z.string().describe("The full, ready-to-send email body."),
+        body: z
+          .string()
+          .describe(
+            "The full, ready-to-send email body. For format 'plain' use plain text. For format 'html' use an inline-styled HTML fragment (paragraphs in <p>, lists in <ul>/<li>, links in <a>, emphasis in <strong>/<em>) — inline style attributes only, no <html>/<head>/<body> wrapper; it is placed inside a branded card.",
+          ),
+        format: z
+          .enum(["plain", "html"])
+          .describe(
+            "Whether the body is plain text or styled HTML. Default to 'plain' for short/casual notes. Use 'html' when the user asks for a professional, formatted, designed, or branded-looking email. If the user hasn't said and a styled email might be wanted, briefly ask them which they prefer before calling this.",
+          ),
       }),
-      execute: async ({ to, subject, body }) => {
+      execute: async ({ to, subject, body, format }) => {
         const resolved = await resolveRecipient(userId, to);
         const params = new URLSearchParams();
         if (resolved) params.set("to", resolved);
         if (subject) params.set("subject", subject);
         if (body) params.set("body", body);
+        if (format === "html") params.set("html", "1");
         return capture({
           kind: "compose",
           url: `/mail/compose?${params.toString()}`,
@@ -324,7 +334,7 @@ function buildSystem(
     "Resolve relative dates ('next Thursday', 'tomorrow at 9') against the current date above. If a timezone matters and is ambiguous, ask.",
     "",
     "HOW YOU TAKE ACTION — you never send mail or create events directly. Instead you prepare them for the user to review:",
-    "• To write, draft, reply to, or send an email → call `composeEmail` with the recipient and the COMPLETE subject and body. It opens a pre-filled compose screen the user reviews and sends.",
+    "• To write, draft, reply to, or send an email → call `composeEmail` with the recipient and the COMPLETE subject and body. It opens a pre-filled compose screen the user reviews and sends. Choose `format`: 'plain' for ordinary notes, 'html' (inline-styled) for professional/designed emails. If the user might want a styled email and hasn't said, ask whether they'd like plain text or a styled HTML email before drafting.",
     "• To schedule, book, or create a calendar event → call `scheduleEvent`. It opens a pre-filled new-event screen the user reviews and creates.",
     "• To find or browse mail → answer from the read tools, or call `searchMail` to take them to filtered results.",
     "Before drafting, USE the read tools to look up the right person's email address, find the email/thread being referred to, or check the calendar for free time. Write complete, well-judged drafts — do not leave blanks or placeholders.",

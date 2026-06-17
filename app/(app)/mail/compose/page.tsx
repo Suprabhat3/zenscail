@@ -1,23 +1,47 @@
 import Link from "next/link";
 import { requireAppIdentity } from "@/lib/identity";
+import { requireSession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { RecipientField } from "@/components/mail/RecipientField";
 import { SendBar } from "@/components/mail/SendBar";
-import { SmartComposeTextarea } from "@/components/mail/SmartComposeTextarea";
+import { RichComposer } from "@/components/mail/RichComposer";
 
 export const metadata = { title: "Compose — ZenScail" };
 
-const fieldLabel = "w-16 shrink-0 pt-2.5 text-sm font-medium text-(--muted)";
 const bareInput =
   "flex-1 bg-transparent py-2 text-sm text-(--ink) placeholder:text-(--muted) focus:outline-none";
 
 export default async function ComposePage({
   searchParams,
 }: {
-  searchParams: Promise<{ to?: string; subject?: string; body?: string }>;
+  searchParams: Promise<{
+    to?: string;
+    subject?: string;
+    body?: string;
+    html?: string;
+    draft?: string;
+  }>;
 }) {
-  const { to, subject, body } = await searchParams;
+  const { to, subject, body, html, draft } = await searchParams;
   const { identity } = await requireAppIdentity();
   const me = identity.primaryEmail;
+
+  // Load a saved draft when reopened from the Drafts folder; URL params (e.g. an
+  // AI-prepared compose) take precedence when present.
+  let saved: { id: string; to: string; cc: string | null; subject: string; body: string; isHtml: boolean } | null =
+    null;
+  if (draft) {
+    const session = await requireSession();
+    saved = await prisma.draft.findFirst({
+      where: { id: draft, userId: session.user.id },
+      select: { id: true, to: true, cc: true, subject: true, body: true, isHtml: true },
+    });
+  }
+
+  const initialTo = to ?? saved?.to ?? "";
+  const initialSubject = subject ?? saved?.subject ?? "";
+  const initialBody = body ?? saved?.body ?? "";
+  const initialIsHtml = html === "1" || (body == null && (saved?.isHtml ?? false));
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
@@ -40,9 +64,9 @@ export default async function ComposePage({
         <div className="px-5 pt-4">
           {/* To — autocompleting recipient field */}
           <div className="flex items-start gap-3 border-b border-(--line-soft) pb-3">
-            <label className={fieldLabel}>To</label>
+            <label className="w-16 shrink-0 pt-2.5 text-sm font-medium text-(--muted)">To</label>
             <div className="flex-1">
-              <RecipientField name="to" required defaultValue={to ?? ""} placeholder="Start typing a name or email…" />
+              <RecipientField name="to" required defaultValue={initialTo} placeholder="Start typing a name or email…" />
             </div>
           </div>
 
@@ -55,21 +79,18 @@ export default async function ComposePage({
               id="subject"
               type="text"
               name="subject"
-              defaultValue={subject ?? ""}
+              defaultValue={initialSubject}
               placeholder="Add a subject"
               className={bareInput}
             />
           </div>
         </div>
 
-        {/* Body — with smart-compose ghost text (off by default; /settings/mail) */}
-        <SmartComposeTextarea
-          name="body"
-          rows={13}
-          required
-          defaultValue={body ?? ""}
-          placeholder="Write your message…"
-          className="px-5 py-4"
+        {/* Body — Plain (smart-compose ghost text) / Styled (rich HTML + AI Prettify) */}
+        <RichComposer
+          defaultBody={initialBody}
+          defaultIsHtml={initialIsHtml}
+          draftId={saved?.id ?? ""}
           subjectId="subject"
           toName="to"
         />

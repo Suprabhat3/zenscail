@@ -16,6 +16,7 @@ const toc = [
   { id: "ai-keys", title: "AI providers & keys" },
   { id: "acceptable-use", title: "Acceptable use" },
   { id: "billing", title: "Plans & billing" },
+  { id: "refunds", title: "Cancellation & refunds" },
   { id: "third-party", title: "Third-party services" },
   { id: "ip", title: "Intellectual property" },
   { id: "disclaimers", title: "Disclaimers" },
@@ -30,7 +31,7 @@ export default function TermsPage() {
       eyebrow="Legal"
       title="Terms of Service"
       intro="These terms are the agreement between you and ZenScail. They’re written to be readable — please take a minute, because using the Service means you accept them."
-      updated="June 13, 2026"
+      updated="June 17, 2026"
       toc={toc}
       contact={{
         heading: "Need clarification?",
@@ -52,7 +53,7 @@ export default function TermsPage() {
       <section id="eligibility" className="doc-section">
         <h2>Eligibility &amp; your account</h2>
         <ul>
-          <li>You must be at least 16 years old to use ZenScail.</li>
+          <li>You must be at least 18 years old, and able to form a binding contract, to use ZenScail.</li>
           <li>You&rsquo;re responsible for the activity under your account and for keeping your credentials secure.</li>
           <li>You agree to provide accurate information and to verify your email address when asked.</li>
           <li>Notify us promptly at <Mail address="support@zenscail.com" /> if you suspect unauthorised access.</li>
@@ -119,12 +120,114 @@ export default function TermsPage() {
 
       <section id="billing" className="doc-section">
         <h2>Plans &amp; billing</h2>
+        <p>ZenScail is offered on two plans:</p>
+        <ul>
+          <li>
+            <strong>ZenScail Free (bring your own key)</strong> — ₹0. You get every
+            feature and connect your own AI provider key. You pay nothing to us; any model
+            usage is billed to you directly by your AI provider.
+          </li>
+          <li>
+            <strong>ZenScail Cloud</strong> — a paid subscription where we provide the AI
+            models, so there are no keys to manage and AI usage is included.
+          </li>
+        </ul>
+
+        <h3>Cloud price &amp; billing cycle</h3>
+        <ul>
+          <li>
+            ZenScail Cloud costs <strong>₹749 per month</strong> during our launch period
+            — a 25% discount off the ₹999 list price. The price shown at checkout is the
+            price that applies, and is <strong>inclusive of applicable taxes (including
+            GST)</strong> unless stated otherwise.
+          </li>
+          <li>
+            The launch discount is promotional and may end at any time. If it does, your
+            renewal price will change to the then-current price, but only after we give you
+            advance notice (see below).
+          </li>
+          <li>
+            The subscription is <strong>monthly and renews automatically</strong>. By
+            subscribing, you authorise us and our payment processor to charge your selected
+            payment method for each billing cycle, in advance, until you cancel.
+          </li>
+        </ul>
+
+        <h3>Payments</h3>
         <p>
-          ZenScail offers a free plan and may offer paid plans. Paid subscriptions renew
-          automatically until cancelled, and fees are billed in advance and are
-          non-refundable except where required by law. We&rsquo;ll give notice before any
-          price change takes effect. Because the AI runs on your own keys, model usage
-          costs are billed to you by your AI provider directly, not by us.
+          Payments for ZenScail Cloud are processed securely by{" "}
+          <strong>Razorpay</strong>, our third-party payment processor, who sets up the
+          recurring mandate (auto-pay) for your subscription. We do <strong>not</strong>{" "}
+          receive or store your full card or bank details — those are handled by Razorpay
+          under its own terms and security standards. Your use of Razorpay is subject to
+          Razorpay&rsquo;s terms and privacy policy.
+        </p>
+
+        <h3>Failed or declined payments</h3>
+        <p>
+          If a renewal payment fails or your mandate is revoked, we may retry the charge
+          and, if it still cannot be collected, suspend or downgrade your Cloud access
+          until payment succeeds. You can keep using ZenScail Free with your own AI key at
+          any time.
+        </p>
+
+        <h3>Price changes</h3>
+        <p>
+          We&rsquo;ll give you reasonable advance notice (by email or in the app) before
+          any change to your recurring price takes effect. If you don&rsquo;t agree to a
+          new price, you can cancel before it applies; continuing your subscription after
+          the change means you accept the new price.
+        </p>
+
+        <div className="doc-callout sage">
+          <p>
+            <strong>On the Free plan, AI costs are not ours to bill.</strong> Because the
+            AI runs on your own key, model usage is billed to you by your AI provider
+            directly. ZenScail charges you only for the Cloud subscription, if you choose
+            it.
+          </p>
+        </div>
+      </section>
+
+      <section id="refunds" className="doc-section">
+        <h2>Cancellation &amp; refunds</h2>
+        <h3>Cancelling</h3>
+        <p>
+          You can cancel ZenScail Cloud at any time from{" "}
+          <strong>Settings → Billing</strong>. When you cancel:
+        </p>
+        <ul>
+          <li>Your subscription stops renewing — you won&rsquo;t be charged again.</li>
+          <li>
+            You <strong>keep Cloud access until the end of the period you&rsquo;ve already
+            paid for</strong>. After that date, your account moves to ZenScail Free, where
+            you can continue using ZenScail with your own AI key.
+          </li>
+          <li>
+            Your renewal date and remaining days are always shown on the Billing page.
+          </li>
+        </ul>
+
+        <h3>Refunds</h3>
+        <p>
+          Subscription fees are <strong>non-refundable</strong>, except where a refund is
+          required by applicable law. In particular:
+        </p>
+        <ul>
+          <li>
+            We don&rsquo;t provide prorated or partial refunds for the unused part of a
+            billing period when you cancel mid-cycle — instead, you keep access until the
+            period ends.
+          </li>
+          <li>
+            We don&rsquo;t refund a renewal simply because you forgot to cancel before it
+            charged, though you&rsquo;re welcome to cancel to prevent the next renewal.
+          </li>
+        </ul>
+        <p>
+          If you believe you were charged in error or have a billing concern, contact us at{" "}
+          <Mail address="support@zenscail.com " /> and we&rsquo;ll look into it promptly and
+          in good faith.
         </p>
       </section>
 
@@ -184,9 +287,19 @@ export default function TermsPage() {
         <p>
           We may update these terms from time to time. For material changes we&rsquo;ll
           provide notice, and continued use after changes take effect means you accept the
-          revised terms. These terms are governed by the laws applicable at ZenScail&rsquo;s
-          principal place of business, without regard to conflict-of-law rules. Questions?
-          Reach our legal team at <Mail address="support@zenscail.com" />.
+          revised terms.
+        </p>
+        <p>
+          These terms are governed by the laws of <strong>India</strong>, without regard to
+          conflict-of-law rules, and the courts of India will have jurisdiction over any
+          dispute arising from them or from your use of the Service.
+        </p>
+        <p>
+          For any questions, complaints, or grievances about the Service — including issues
+          covered by India&rsquo;s Information Technology Act and the Digital Personal Data
+          Protection Act — you can reach us at <Mail address="support@zenscail.com" />. We
+          aim to acknowledge grievances within a reasonable time and resolve them as
+          required by applicable law.
         </p>
       </section>
     </DocShell>

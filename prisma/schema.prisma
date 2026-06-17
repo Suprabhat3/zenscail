@@ -211,6 +211,9 @@ model ScheduledSend {
   cc        String?
   subject   String
   body      String
+  // When true, `body` is a full inline-styled HTML document; we send it as the
+  // HTML part of a multipart/alternative message with a stripped text fallback.
+  isHtml    Boolean   @default(false) @map("is_html")
   threadId  String?   @map("thread_id")
   inReplyTo String?   @map("in_reply_to")
   sendAt    DateTime  @map("send_at")
@@ -226,6 +229,27 @@ model ScheduledSend {
   @@index([userId, status, sendAt])
   @@index([status, sendAt])
   @@map("scheduled_send")
+}
+
+model Draft {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  // Compose fields. Empty strings rather than null so a brand-new draft is valid.
+  to        String   @default("")
+  cc        String?
+  subject   String   @default("")
+  body      String   @default("")
+  // When true, `body` is inline-styled HTML (rich composer / AI prettify); the
+  // composer reloads it into the rich editor and sends it as HTML.
+  isHtml    Boolean  @default(false) @map("is_html")
+  // Set when the draft is a reply, so reopening keeps it threaded.
+  threadId  String?  @map("thread_id")
+  inReplyTo String?  @map("in_reply_to")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt])
+  @@map("draft")
 }
 
 model FollowUp {

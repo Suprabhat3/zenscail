@@ -23,7 +23,7 @@ export default function CookiesPage() {
       eyebrow="Legal"
       title="Cookie Policy"
       intro="We keep cookies to a minimum — just enough to sign you in, keep you secure, and understand what’s working. No advertising, no cross-site tracking."
-      updated="June 13, 2026"
+      updated="June 17, 2026"
       toc={toc}
       contact={{
         heading: "Questions about cookies?",
@@ -63,7 +63,9 @@ export default function CookiesPage() {
         <h2>Third-party cookies</h2>
         <p>
           Signing in with Google may involve cookies set by Google as part of the OAuth
-          flow, governed by Google&rsquo;s own policies. We don&rsquo;t embed advertising
+          flow, and subscribing to ZenScail Cloud loads Razorpay&rsquo;s secure checkout,
+          which sets its own cookies to process your payment and prevent fraud. Both are
+          governed by those providers&rsquo; own policies. We don&rsquo;t embed advertising
           networks or social-media tracking pixels.
         </p>
       </section>

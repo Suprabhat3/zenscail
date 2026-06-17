@@ -98,6 +98,16 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Wrap user-composed email content (an inline-styled HTML fragment, e.g. from
+ * the rich composer or the AI "Prettify" step) in the branded ZenScail card so
+ * it renders consistently across mail clients. `preheader` is the hidden inbox
+ * preview line. Returns a full HTML document ready for the HTML MIME part.
+ */
+export function wrapComposedEmail(opts: { body: string; preheader?: string }): string {
+  return layout({ preheader: opts.preheader ?? "", body: opts.body });
+}
+
 export function verificationEmail(opts: { code: string; name?: string }): {
   subject: string;
   html: string;

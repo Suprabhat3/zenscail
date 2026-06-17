@@ -98,25 +98,72 @@ export function extractBodies(payload: GmailPayload | undefined): {
   return { text, html };
 }
 
-/** Build a base64url-encoded RFC 2822 message for gmail.api.messages.send. */
+/** Collapse an HTML body into a rough plain-text fallback for the text part. */
+function htmlToPlain(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Build a base64url-encoded RFC 2822 message for gmail.api.messages.send.
+ * Plain by default. When `html` is given we send a multipart/alternative with
+ * both a plain-text fallback and the styled HTML part, so every mail client
+ * shows something readable.
+ */
 export function buildRawEmail(opts: {
   to: string;
   subject: string;
   text: string;
+  /** Inline-styled HTML body. When present the message is sent as HTML. */
+  html?: string;
   cc?: string;
   inReplyTo?: string;
   references?: string;
 }): string {
-  const lines = [
+  const headers = [
     `To: ${opts.to}`,
     ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
     `Subject: ${opts.subject}`,
     ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
     ...(opts.references ? [`References: ${opts.references}`] : []),
-    `Content-Type: text/plain; charset="UTF-8"`,
     `MIME-Version: 1.0`,
+  ];
+
+  if (!opts.html) {
+    const lines = [...headers, `Content-Type: text/plain; charset="UTF-8"`, ``, opts.text];
+    return encodeBase64Url(lines.join("\r\n"));
+  }
+
+  // multipart/alternative: text fallback first, HTML second (clients pick the
+  // richest part they can render). Boundary is fixed but unambiguous.
+  const boundary = "zenscail_boundary_a1b2c3";
+  const text = opts.text?.trim() ? opts.text : htmlToPlain(opts.html);
+  const lines = [
+    ...headers,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
     ``,
-    opts.text,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset="UTF-8"`,
+    ``,
+    text,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/html; charset="UTF-8"`,
+    ``,
+    opts.html,
+    ``,
+    `--${boundary}--`,
   ];
   return encodeBase64Url(lines.join("\r\n"));
 }

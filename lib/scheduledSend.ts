@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { corsairTenant } from "@/lib/corsair";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { sendEmail } from "@/lib/gmail";
+import { wrapComposedEmail } from "@/lib/email/render";
 import { publish } from "@/lib/realtime";
 
 /**
@@ -32,7 +33,12 @@ export async function deliverScheduledSend(id: number): Promise<
       to: row.to,
       cc: row.cc ?? undefined,
       subject: row.subject,
-      text: row.body,
+      // For HTML drafts `body` is the editor's inline-styled fragment; wrap it
+      // in the branded card shell and let buildRawEmail derive the text fallback.
+      text: row.isHtml ? "" : row.body,
+      html: row.isHtml
+        ? wrapComposedEmail({ body: row.body, preheader: row.subject })
+        : undefined,
       threadId: row.threadId ?? undefined,
       inReplyTo: row.inReplyTo ?? undefined,
       references: row.inReplyTo ?? undefined,

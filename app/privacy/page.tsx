@@ -12,6 +12,7 @@ const toc = [
   { id: "overview", title: "Overview" },
   { id: "information-we-collect", title: "Information we collect" },
   { id: "how-we-use", title: "How we use it" },
+  { id: "payments", title: "Payments & subscriptions" },
   { id: "ai-and-keys", title: "AI processing & your keys" },
   { id: "sharing", title: "How we share data" },
   { id: "retention", title: "Data retention" },
@@ -29,7 +30,7 @@ export default function PrivacyPage() {
       eyebrow="Legal"
       title="Privacy Policy"
       intro="ZenScail reads some of the most personal data you own — your inbox and your calendar. This policy explains exactly what we touch, what we never touch, and the controls you keep."
-      updated="June 13, 2026"
+      updated="June 17, 2026"
       toc={toc}
       contact={{
         heading: "Questions about your privacy?",
@@ -73,6 +74,14 @@ export default function PrivacyPage() {
           summarise, and your calendar events and availability. We access this data on
           your behalf and only when you use a feature that needs it.
         </p>
+        <h3>Billing &amp; subscription information</h3>
+        <p>
+          If you subscribe to ZenScail Cloud, our payment processor (Razorpay) collects and
+          processes your payment details to set up the recurring charge. We do not receive
+          or store your full card or bank details. We do keep limited subscription
+          metadata — your plan, subscription status, renewal date, and a payment/subscription
+          reference — so we can give you the right access and show your billing state.
+        </p>
         <h3>Usage & device information</h3>
         <p>
           We collect basic technical data — IP address, browser type, pages viewed, and
@@ -105,6 +114,25 @@ export default function PrivacyPage() {
         </p>
       </section>
 
+      <section id="payments" className="doc-section">
+        <h2>Payments &amp; subscriptions</h2>
+        <p>
+          Paid subscriptions to ZenScail Cloud are handled by{" "}
+          <strong>Razorpay</strong>, our third-party payment processor. When you subscribe,
+          your card or bank information is collected and processed by Razorpay under its own
+          privacy policy and security standards — <strong>ZenScail never sees or stores your
+          full payment credentials.</strong>
+        </p>
+        <p>
+          We receive back from Razorpay only what we need to manage your account: a
+          subscription identifier, the plan, the status (active, cancelled, etc.), and the
+          current period end. We use this solely to grant the correct access, show your
+          billing state, and meet our financial and legal record-keeping obligations. For
+          how subscriptions, cancellation, and refunds work, see our{" "}
+          <a href="/terms">Terms of Service</a>.
+        </p>
+      </section>
+
       <section id="ai-and-keys" className="doc-section">
         <h2>AI processing &amp; your keys</h2>
         <p>
@@ -133,6 +161,7 @@ export default function PrivacyPage() {
         <p>We share personal information only in these limited cases:</p>
         <ul>
           <li><strong>Service providers (sub-processors)</strong> who run our infrastructure — hosting, our database, transactional email delivery, and the AI provider you choose. Each is bound by contract to protect your data.</li>
+          <li><strong>Razorpay</strong>, our payment processor, to securely take payment and manage your ZenScail Cloud subscription.</li>
           <li><strong>Google</strong>, to read and act on your mailbox and calendar at your direction.</li>
           <li><strong>Legal & safety</strong> reasons, when required by law or to protect the rights and safety of users.</li>
           <li><strong>Business transfers</strong>, if ZenScail is involved in a merger or acquisition — you&rsquo;ll be notified before your data becomes subject to a different policy.</li>
@@ -178,8 +207,9 @@ export default function PrivacyPage() {
         <p>
           You can disconnect Google at any time from the app, or revoke ZenScail&rsquo;s
           access from your Google Account&rsquo;s security settings. To exercise any
-          right, email <Mail address="support@zenscail.com" /> <br />and we&rsquo;ll respond
-          within the time required by applicable law.
+          right — or to raise a privacy grievance under India&rsquo;s Digital Personal Data
+          Protection Act — email <Mail address="support@zenscail.com" /> <br />and
+          we&rsquo;ll respond within the time required by applicable law.
         </p>
       </section>
 
@@ -196,8 +226,9 @@ export default function PrivacyPage() {
       <section id="children" className="doc-section">
         <h2>Children&rsquo;s privacy</h2>
         <p>
-          ZenScail is not directed to children under 16, and we do not knowingly collect
-          their personal information. If you believe a child has provided us data, contact{" "}
+          ZenScail is intended for users aged 18 and over and is not directed to children.
+          We do not knowingly collect personal information from anyone under 18. If you
+          believe a minor has provided us data, contact{" "}
           <Mail address="support@zenscail.com" /> <br /> and we will delete it.
         </p>
       </section>
