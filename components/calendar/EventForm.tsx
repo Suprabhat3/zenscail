@@ -67,14 +67,23 @@ export function EventForm({
 }: {
   action: (formData: FormData) => Promise<void>;
   event?: GcalEvent;
-  defaults?: { date?: string; summary?: string; description?: string };
+  defaults?: {
+    date?: string;
+    summary?: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
+    attendees?: string;
+  };
   submitLabel: string;
 }) {
-  const attendees = (event?.attendees ?? [])
-    .filter((a) => !a.self)
-    .map((a) => a.email)
-    .filter(Boolean)
-    .join(", ");
+  const attendees = event
+    ? (event.attendees ?? [])
+        .filter((a) => !a.self)
+        .map((a) => a.email)
+        .filter(Boolean)
+        .join(", ")
+    : (defaults?.attendees ?? "");
 
   const [allDay, setAllDay] = useState(
     Boolean(event?.start?.date && !event?.start?.dateTime),
@@ -155,7 +164,7 @@ export function EventForm({
                 <input
                   type="time"
                   name="startTime"
-                  defaultValue={timePart(event?.start?.dateTime)}
+                  defaultValue={timePart(event?.start?.dateTime) || defaults?.startTime || ""}
                   className={`${inputClass} mt-1.5`}
                 />
               </label>
@@ -164,7 +173,7 @@ export function EventForm({
                 <input
                   type="time"
                   name="endTime"
-                  defaultValue={timePart(event?.end?.dateTime)}
+                  defaultValue={timePart(event?.end?.dateTime) || defaults?.endTime || ""}
                   className={`${inputClass} mt-1.5`}
                 />
               </label>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { useChatDock } from "./ChatProvider";
@@ -40,6 +40,31 @@ function toolLabel(toolName: string): string {
   if (toolName.includes("get") || toolName.includes("list") || toolName.includes("search"))
     return "Looking things up…";
   return `Working: ${toolName}`;
+}
+
+/** Our review-first action tools that hand off a pre-filled page. */
+const ACTION_TOOLS = ["composeEmail", "scheduleEvent", "searchMail"];
+
+type ActionDirective = { url: string; label: string };
+
+/** A finished action tool-part → the page to open, or null if not ready. */
+function directiveOf(part: { type: string; state?: string; output?: unknown }): ActionDirective | null {
+  if (!part.type.startsWith("tool-") || !ACTION_TOOLS.includes(part.type.slice(5))) return null;
+  if (part.state !== "output-available") return null;
+  const out = part.output as { url?: string; label?: string } | undefined;
+  return out?.url ? { url: out.url, label: out.label || "Open" } : null;
+}
+
+/** The most recent ready directive across messages (for auto-redirect). */
+function lastDirective(messages: UIMessage[]): ActionDirective | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const parts = messages[i].parts as { type: string; state?: string; output?: unknown }[];
+    for (let j = parts.length - 1; j >= 0; j--) {
+      const d = directiveOf(parts[j]);
+      if (d) return d;
+    }
+  }
+  return null;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -94,6 +119,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
   const { open, setOpen, seed, consumeSeed } = useChatDock();
   const { toast } = useToast();
   const pathname = usePathname();
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [model, setModel] = useState(defaultModel);
   const [feedback, setFeedback] = useState<Feedback>({});
@@ -123,6 +149,13 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
       }).then((ok) => {
         if (ok) void refreshHistory();
       });
+      // The assistant prepared an email / event / search — take the user to the
+      // pre-filled screen so they can review and send/create.
+      const directive = lastDirective(finished);
+      if (directive) {
+        setOpen(false);
+        router.push(directive.url);
+      }
     },
   });
   const busy = status === "submitted" || status === "streaming";
@@ -402,6 +435,30 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
                           </p>
                         ) : (
                           <Markdown key={i}>{part.text}</Markdown>
+                        );
+                      }
+                      if (typeof part.type === "string" && part.type.startsWith("tool-") && ACTION_TOOLS.includes(part.type.slice(5))) {
+                        const dir = directiveOf(part as { type: string; state?: string; output?: unknown });
+                        if (dir) {
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => { setOpen(false); router.push(dir.url); }}
+                              className="my-1 flex w-full items-center justify-between gap-2 rounded-xl border border-(--accent)/40 bg-(--accent-soft) px-3 py-2 text-left text-sm font-medium text-(--accent-deep) transition hover:border-(--accent)"
+                            >
+                              <span className="truncate">{dir.label} — review &amp; send</span>
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M5 12h14M13 6l6 6-6 6" />
+                              </svg>
+                            </button>
+                          );
+                        }
+                        return (
+                          <div key={i} className="my-1 flex items-center gap-2 text-xs text-(--muted)">
+                            <span className="text-(--accent)">⋯</span>
+                            <span>Preparing it for you…</span>
+                          </div>
                         );
                       }
                       if (part.type === "dynamic-tool") {

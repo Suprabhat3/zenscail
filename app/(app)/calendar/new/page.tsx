@@ -19,9 +19,16 @@ function formatTime(value?: string): string {
 export default async function NewEventPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; summary?: string; description?: string }>;
+  searchParams: Promise<{
+    date?: string;
+    summary?: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
+    attendees?: string;
+  }>;
 }) {
-  const { date, summary, description } = await searchParams;
+  const { date, summary, description, startTime, endTime, attendees } = await searchParams;
   const session = await requireSession();
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
@@ -68,7 +75,7 @@ export default async function NewEventPage({
       <div className="mt-6 rounded-3xl border border-(--line-soft) bg-(--paper) p-6 shadow-(--shadow-card)">
         <EventForm
           action={createEventAction}
-          defaults={{ date, summary, description }}
+          defaults={{ date, summary, description, startTime, endTime, attendees }}
           submitLabel="Create event"
         />
       </div>

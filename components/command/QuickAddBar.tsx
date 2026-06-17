@@ -5,38 +5,27 @@ import { useRouter } from "next/navigation";
 import { useChatDock } from "@/components/chat/ChatProvider";
 import { useToast } from "@/components/ui/Toast";
 import { MicButton } from "@/components/voice/MicButton";
-import {
-  quickAdd,
-  createQuickEvent,
-  type QuickAddIntent,
-} from "@/app/(app)/quick-add/actions";
+import { runQuickCommand } from "@/app/(app)/quick-add/actions";
 
-type EventPending = Extract<QuickAddIntent, { kind: "event" }>;
-
-// Productive-looking progress steps shown while the (4–10s) parse is in flight.
-// We can't stream the real intent, so we advance through these on a timer to
-// reassure the user that work is happening.
+// Productive-looking progress steps shown while the agent works (it finds the
+// person/thread, drafts the email/event, then hands off a ready-to-review
+// screen). We can't stream the real steps here, so we advance on a timer.
 const STEPS = [
   "Understanding your request…",
   "Checking your inbox & calendar…",
   "Finding the right people…",
-  "Putting it together…",
+  "Drafting it for you…",
   "Almost there…",
 ];
 
-function whenLabel(startIso: string, endIso: string): string {
-  const s = new Date(startIso);
-  const e = new Date(endIso);
-  const date = s.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-  const st = s.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const et = e.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return `${date}, ${st}–${et}`;
-}
-
 /**
- * Natural-language quick-add bar in the app header. One line of text is parsed
- * by `quickAdd` into an event / email / search / agent intent. Writes (events)
- * ask for a one-line confirmation first; everything else hands off immediately.
+ * Natural-language quick-add bar in the app header. One line is handed to the
+ * shared assistant agent (`runQuickCommand`), which finds the right contact /
+ * thread, writes the full email or builds the event, then returns a pre-filled
+ * compose / new-event / search page to open. The user reviews and clicks
+ * Send / Create — we never send or create on their behalf. Anything that needs
+ * a back-and-forth is handed to the assistant dock. Every command is saved to
+ * the same history as the dock.
  */
 export function QuickAddBar() {
   const router = useRouter();
@@ -45,7 +34,6 @@ export function QuickAddBar() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(0);
-  const [pending, setPending] = useState<EventPending | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Advance the progress steps while a request is in flight; stop on the last.
@@ -65,69 +53,23 @@ export function QuickAddBar() {
     const value = text.trim();
     if (!value || busy) return;
     setBusy(true);
-    setPending(null);
     try {
-      const intent = await quickAdd(value);
-      switch (intent.kind) {
-        case "event":
-          setPending(intent);
-          break;
-        case "email": {
-          const params = new URLSearchParams();
-          if (intent.to) params.set("to", intent.to);
-          if (intent.subject) params.set("subject", intent.subject);
-          if (intent.body) params.set("body", intent.body);
-          setText("");
-          router.push(`/mail/compose?${params.toString()}`);
-          break;
-        }
-        case "search":
-          setText("");
-          router.push(`/mail?q=${encodeURIComponent(intent.query)}`);
-          break;
-        case "agent":
-          setText("");
-          openWith(intent.text);
-          break;
+      const result = await runQuickCommand(value);
+      setText("");
+      if (result.kind === "navigate") {
+        if (result.label) toast(result.label);
+        router.push(result.url);
+      } else {
+        // Needs a conversation — open the assistant with the original command
+        // so it carries the request out in a streamed back-and-forth.
+        openWith(value);
       }
     } catch {
-      toast("Couldn't parse that — try the assistant instead.");
+      toast("Couldn't do that — try the assistant instead.");
+      openWith(value);
     } finally {
       setBusy(false);
     }
-  }
-
-  async function confirmEvent() {
-    if (!pending) return;
-    setBusy(true);
-    try {
-      const res = await createQuickEvent({
-        summary: pending.summary,
-        startIso: pending.startIso,
-        endIso: pending.endIso,
-        attendees: pending.attendees,
-      });
-      if (res.ok) {
-        toast(`Event created: ${pending.summary}`, {
-          action: { label: "View", onClick: () => router.push("/calendar") },
-        });
-        setPending(null);
-        setText("");
-        router.refresh();
-      } else {
-        toast("Couldn't create the event.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function openInCalendar() {
-    if (!pending) return;
-    const date = pending.startIso.slice(0, 10);
-    setPending(null);
-    setText("");
-    router.push(`/calendar/new?date=${date}&summary=${encodeURIComponent(pending.summary)}`);
   }
 
   return (
@@ -152,11 +94,8 @@ export function QuickAddBar() {
             ref={inputRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setPending(null);
-            }}
             disabled={busy}
-            placeholder="Try “lunch with Sam tomorrow 1pm” or “email Dana the deck is ready”"
+            placeholder="Try “draft an email to Dana that the deck is ready” or “lunch with Sam tomorrow 1pm”"
             className="w-full truncate rounded-full border border-(--line) bg-(--paper) py-2 pr-11 pl-9 text-sm text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft) disabled:opacity-0"
           />
 
@@ -200,49 +139,6 @@ export function QuickAddBar() {
           onError={toast}
         />
       </form>
-
-      {pending && (
-        <div className="absolute top-full left-1/2 z-50 mt-2 w-88 max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-hidden rounded-2xl border border-(--line) bg-(--paper) shadow-2xl">
-          <div className="border-b border-(--line-soft) px-4 py-3">
-            <p className="text-[11px] font-bold tracking-widest text-(--accent) uppercase">
-              Create event?
-            </p>
-            <p className="mt-1.5 truncate text-sm font-semibold text-(--ink)">{pending.summary}</p>
-            <p className="mt-0.5 text-xs text-(--ink-soft)">
-              {whenLabel(pending.startIso, pending.endIso)}
-            </p>
-            {pending.attendees.length > 0 && (
-              <p className="mt-0.5 truncate text-xs text-(--muted)">
-                With {pending.attendees.join(", ")}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 px-4 py-3">
-            <button
-              type="button"
-              onClick={confirmEvent}
-              disabled={busy}
-              className="rounded-full bg-(--ink) px-4 py-2 text-sm font-semibold text-(--bg) transition hover:bg-(--accent) disabled:opacity-60"
-            >
-              {busy ? "Creating…" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={openInCalendar}
-              className="rounded-full border border-(--line) px-3.5 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
-            >
-              Edit details
-            </button>
-            <button
-              type="button"
-              onClick={() => setPending(null)}
-              className="ml-auto rounded-full px-2 py-2 text-sm text-(--muted) transition hover:text-(--ink)"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
