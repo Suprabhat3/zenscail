@@ -88,7 +88,12 @@ export async function POST(req: Request) {
     after(async () => {
       try {
         const t = corsairTenant(tenantId);
-        const { ok, messages } = await listInboxMessages(t, { limit: 25 });
+        // Passing userId hydrates + persists new mail into our CachedMessage
+        // table, so the inbox renders it without a per-message fetch.
+        const { ok, messages } = await listInboxMessages(t, {
+          userId: user.id,
+          limit: 25,
+        });
         if (ok) {
           await classifyMessages(user.id, messages);
           // Generate + cache one-glance summaries for new mail (chief model),

@@ -1,6 +1,13 @@
 import "server-only";
 
+import { after } from "next/server";
 import type { TenantScope } from "@corsair-dev/app";
+import {
+  getCachedMessages,
+  putCachedMessages,
+  getCachedThread,
+  putCachedThread,
+} from "@/lib/mailCache";
 
 // --- Gmail API payload types (subset we use) ---
 
@@ -118,10 +125,27 @@ export function buildRawEmail(opts: {
 
 type MessageRef = { id: string; threadId: string };
 
-/** Hydrate message refs into UI rows via gmail.api.messages.get (metadata only). */
-async function hydrate(t: TenantScope, refs: MessageRef[]): Promise<InboxMessage[]> {
-  const rows = await Promise.all(
-    refs.map(async (ref) => {
+/**
+ * Hydrate message refs into UI rows. When `userId` is given we read content from
+ * our local CachedMessage table first and only call gmail.api.messages.get for
+ * the refs we don't have cached, then persist the freshly fetched ones — so a
+ * warm inbox costs one messages.list call and zero per-message gets.
+ */
+async function hydrate(
+  t: TenantScope,
+  refs: MessageRef[],
+  userId?: string,
+): Promise<InboxMessage[]> {
+  const cached = userId
+    ? await getCachedMessages(
+        userId,
+        refs.map((r) => r.id),
+      ).catch(() => new Map<string, InboxMessage>())
+    : new Map<string, InboxMessage>();
+
+  const misses = refs.filter((r) => !cached.has(r.id));
+  const fetched = await Promise.all(
+    misses.map(async (ref) => {
       // NOTE: do NOT pass `metadataHeaders` — when present Corsair returns
       // `payload.headers: undefined`. Omitting it returns all headers.
       const res = await t.run<GmailMessage>("gmail.api.messages.get", {
@@ -143,7 +167,18 @@ async function hydrate(t: TenantScope, refs: MessageRef[]): Promise<InboxMessage
       } satisfies InboxMessage;
     }),
   );
-  return rows.filter((r): r is InboxMessage => r !== null);
+  const fresh = fetched.filter((r): r is InboxMessage => r !== null);
+
+  // Persist newly fetched rows so subsequent renders are cache-only.
+  if (userId && fresh.length > 0) {
+    await putCachedMessages(userId, fresh).catch(() => {});
+  }
+
+  // Return in the original ref order, content from cache or fresh fetch.
+  const freshById = new Map(fresh.map((r) => [r.id, r]));
+  return refs
+    .map((r) => cached.get(r.id) ?? freshById.get(r.id))
+    .filter((r): r is InboxMessage => r != null);
 }
 
 /**
@@ -159,9 +194,11 @@ export async function listInboxMessages(
     labelIds?: string[];
     /** Needed for TRASH/SPAM folders — Gmail excludes them unless this is set. */
     includeSpamTrash?: boolean;
+    /** App user id — enables the local content cache (skips per-message gets). */
+    userId?: string;
   } = {},
 ): Promise<{ ok: boolean; messages: InboxMessage[] }> {
-  const { query, limit = 25, labelIds, includeSpamTrash } = opts;
+  const { query, limit = 25, labelIds, includeSpamTrash, userId } = opts;
   // The db cache has no searchable content columns, so we list message refs via
   // the API: Gmail `q` for search, or a label filter for folder views.
   const input: Record<string, unknown> = { maxResults: limit };
@@ -181,7 +218,7 @@ export async function listInboxMessages(
     .filter((m): m is { id: string; threadId?: string } => Boolean(m.id))
     .map((m) => ({ id: m.id, threadId: m.threadId ?? "" }));
 
-  const messages = (await hydrate(t, refs)).sort(
+  const messages = (await hydrate(t, refs, userId)).sort(
     (a, b) => b.internalDate - a.internalDate,
   );
   return { ok: true, messages };
@@ -293,6 +330,34 @@ export async function refreshMessages(t: TenantScope, maxResults = 50) {
 
 export async function getThread(t: TenantScope, id: string) {
   return t.run<GmailThread>("gmail.api.threads.get", { id, format: "full" });
+}
+
+/**
+ * Cache-first thread fetch for the conversation view. On a cache hit we return
+ * the stored payload instantly (and, if stale, kick a non-blocking background
+ * refresh via `after()` so it self-heals). On a miss we fetch live and store.
+ * Returns null only when the tenant isn't connected / the API call fails on a
+ * cold cache (caller redirects to /connect).
+ */
+export async function getThreadCached(
+  t: TenantScope,
+  userId: string,
+  id: string,
+): Promise<GmailThread | null> {
+  const hit = await getCachedThread(userId, id).catch(() => null);
+  if (hit) {
+    if (hit.stale) {
+      after(async () => {
+        const res = await getThread(t, id).catch(() => null);
+        if (res?.success) await putCachedThread(userId, id, res.data);
+      });
+    }
+    return hit.data;
+  }
+  const res = await getThread(t, id);
+  if (!res.success) return null;
+  await putCachedThread(userId, id, res.data).catch(() => {});
+  return res.data;
 }
 
 /** Fetch a single message with its full MIME payload (for body extraction). */

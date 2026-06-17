@@ -196,10 +196,10 @@ export default async function MailPage({
   let priorities = new Map<string, RowMeta>();
   if (!snoozedView && !scheduledView) {
     const listOpts = q
-      ? { query: q, limit: 25 }
+      ? { query: q, limit: 25, userId }
       : labelId
-        ? { labelIds: [labelId], limit: 25 }
-        : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: 25 };
+        ? { labelIds: [labelId], limit: 25, userId }
+        : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: 25, userId };
     const result = await listInboxMessages(t, listOpts);
     if (!result.ok) redirect("/connect");
     messages = result.messages;

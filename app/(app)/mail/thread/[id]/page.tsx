@@ -5,12 +5,13 @@ import { getAppIdentityForUser, isFromMe } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import {
-  getThread,
+  getThreadCached,
   markThreadRead,
   extractBodies,
   header,
   type GmailMessage,
 } from "@/lib/gmail";
+import { markThreadReadInCache, putCachedThread } from "@/lib/mailCache";
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
 import { ThreadAiActions } from "@/components/mail/ThreadAiActions";
 import { EmailFrame } from "@/components/mail/EmailFrame";
@@ -110,16 +111,24 @@ export default async function ThreadPage({
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
 
-  const result = await getThread(t, id);
-  if (!result.success) redirect("/connect");
-  const thread = result.data;
+  const thread = await getThreadCached(t, session.user.id, id);
+  if (!thread) redirect("/connect");
   const followUp = await getFollowUp(session.user.id, thread.id ?? id).catch(() => null);
   const messages = thread.messages ?? [];
 
   // Opening a thread marks it read, so it leaves the unread view and the bold
-  // styling in the inbox list. Best-effort — never block the page on it.
+  // styling in the inbox list. Best-effort — never block the page on it. Mirror
+  // the change into the local cache so the inbox row updates without a re-fetch.
   if (messages.some((m) => (m.labelIds ?? []).includes("UNREAD"))) {
-    await markThreadRead(t, id).catch(() => {});
+    for (const m of messages) {
+      if (m.labelIds) m.labelIds = m.labelIds.filter((l) => l !== "UNREAD");
+    }
+    await Promise.all([
+      markThreadRead(t, id).catch(() => {}),
+      markThreadReadInCache(session.user.id, thread.id ?? id),
+      // Persist the now-read thread so re-opening from cache doesn't re-mark it.
+      putCachedThread(session.user.id, thread.id ?? id, thread),
+    ]);
   }
 
   if (messages.length === 0) {
