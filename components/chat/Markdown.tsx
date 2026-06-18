@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
  */
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="md-body min-w-0 text-sm leading-relaxed">
+    <div className="md-body min-w-0 max-w-full text-sm leading-relaxed [overflow-wrap:anywhere]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -29,11 +29,20 @@ export function Markdown({ children }: { children: string }) {
               href={href}
               target={href?.startsWith("/") ? undefined : "_blank"}
               rel="noreferrer"
-              className="font-medium text-(--accent) underline decoration-(--accent-tint) underline-offset-2 hover:decoration-(--accent)"
+              className="font-medium text-(--accent) underline decoration-(--accent-tint) underline-offset-2 [overflow-wrap:anywhere] hover:decoration-(--accent)"
             >
               {children}
             </a>
           ),
+          img: ({ src, alt }) =>
+            typeof src === "string" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={alt ?? ""}
+                className="my-2 h-auto max-w-full rounded-xl border border-(--line-soft)"
+              />
+            ) : null,
           ul: ({ children }) => (
             <ul className="my-2 list-disc space-y-1 pl-5 marker:text-(--accent)">{children}</ul>
           ),
@@ -53,7 +62,7 @@ export function Markdown({ children }: { children: string }) {
               return <code className={`${className ?? ""} block`}>{children}</code>;
             }
             return (
-              <code className="rounded bg-(--bg-deep) px-1.5 py-0.5 font-mono text-[0.85em] text-(--accent-deep)">
+              <code className="rounded bg-(--bg-deep) px-1.5 py-0.5 font-mono text-[0.85em] text-(--accent-deep) [overflow-wrap:anywhere]">
                 {children}
               </code>
             );
