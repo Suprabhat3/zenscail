@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useChat } from "@ai-sdk/react";
+import { Markdown } from "./Markdown";
 
 function toolLabel(toolName: string): string {
   if (toolName.includes("send")) return "Sending email…";
@@ -47,7 +48,7 @@ export function ChatPanel() {
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex"}>
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+              className={`min-w-0 max-w-[85%] overflow-hidden rounded-2xl px-4 py-3 text-sm [overflow-wrap:anywhere] ${
                 m.role === "user"
                   ? "bg-(--ink) text-(--bg)"
                   : "border border-(--line-soft) bg-(--paper) text-(--ink-soft) shadow-(--shadow-card)"
@@ -55,10 +56,12 @@ export function ChatPanel() {
             >
               {m.parts.map((part, i) => {
                 if (part.type === "text") {
-                  return (
-                    <p key={i} className="whitespace-pre-wrap leading-relaxed">
+                  return m.role === "user" ? (
+                    <p key={i} className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">
                       {part.text}
                     </p>
+                  ) : (
+                    <Markdown key={i}>{part.text}</Markdown>
                   );
                 }
                 if (part.type === "dynamic-tool") {
