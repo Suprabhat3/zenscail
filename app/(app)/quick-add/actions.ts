@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { requireSession } from "@/lib/session";
+import { checkUserAiLimit } from "@/lib/rate-limit";
 import { getAppIdentityForUser, mailboxContextLine } from "@/lib/identity";
 import { getModelForUser } from "@/lib/ai/registry";
 import { runAgentCommand } from "@/lib/ai/assistant";
@@ -50,6 +51,11 @@ export async function runQuickCommand(text: string): Promise<QuickResult> {
   if (!trimmed) return { kind: "chat", text: trimmed };
 
   const session = await requireSession();
+
+  // Per-user AI guard: this command fans out to one or more LLM calls.
+  if (!checkUserAiLimit(session.user.id).ok) {
+    return { kind: "chat", text: "You're sending commands too quickly — give it a few seconds and try again." };
+  }
 
   // Cheap classify: fast-path obvious searches, hand the rest to the agent.
   let kind: "search" | "action" = "action";
