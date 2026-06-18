@@ -117,7 +117,10 @@ export default async function ConnectPage() {
       )}
 
       {/* CTA */}
-      <ConnectButton allConnected={allConnected} />
+      <ConnectButton
+        statuses={statuses.map((s) => ({ id: s.id, label: s.label, connected: s.connected }))}
+        allConnected={allConnected}
+      />
 
       {allConnected && (
         <div className="mt-8 rounded-2xl border border-[#CBD8BC] bg-[#EFF4E8] px-5 py-4">

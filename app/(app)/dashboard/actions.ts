@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSession } from "@/lib/session";
+import { checkUserAiLimit } from "@/lib/rate-limit";
 import {
   generateDailyBrief,
   setBriefItemState,
@@ -22,6 +23,10 @@ const SetBriefItemStateSchema = z.object({
  */
 export async function generateBriefAction(): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
+  // Per-user AI guard: brief generation is an expensive multi-step LLM call.
+  if (!checkUserAiLimit(session.user.id).ok) {
+    return { ok: false, error: "Too many requests — please wait a few seconds and try again." };
+  }
   try {
     await generateDailyBrief(session.user.id);
     revalidatePath("/dashboard");

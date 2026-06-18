@@ -264,6 +264,11 @@ button { font-family: inherit; cursor: pointer; }
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
+  transition: box-shadow 0.15s ease;
+}
+.hv-reminder {
+  position: absolute;
+  transition: box-shadow 0.15s ease;
 }
 .hv-brief {
   top: 30px;
@@ -314,7 +319,6 @@ button { font-family: inherit; cursor: pointer; }
   width: 250px;
   padding: 18px 20px;
   z-index: 2;
-  transform: rotate(2.5deg);
 }
 .hv-cal-month {
   font-size: 13px;
@@ -362,7 +366,6 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   gap: 12px;
   align-items: center;
-  transform: rotate(-1.5deg);
 }
 .hv-event-bar {
   width: 4px;
@@ -388,7 +391,6 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--bg);
   border: none;
   box-shadow: var(--shadow-float);
-  transform: rotate(-2deg);
 }
 .hv-reminder svg { flex-shrink: 0; }
 
@@ -398,7 +400,6 @@ button { font-family: inherit; cursor: pointer; }
   width: 300px;
   padding: 16px 20px;
   z-index: 4;
-  transform: rotate(1.2deg);
 }
 .hv-reply-label {
   font-size: 11.5px;

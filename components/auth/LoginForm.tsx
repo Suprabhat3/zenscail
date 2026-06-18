@@ -40,6 +40,7 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -52,6 +53,12 @@ export function LoginForm({
     e.preventDefault();
     setError(null);
     setNotice(null);
+
+    if (mode === "signup" && !agreed) {
+      setError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
+
     setPending(true);
 
     if (mode === "signup") {
@@ -115,6 +122,10 @@ export function LoginForm({
 
   async function handleGoogle() {
     setError(null);
+    if (mode === "signup" && !agreed) {
+      setError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     await authClient.signIn.social({ provider: "google", callbackURL: next });
   }
 
@@ -274,6 +285,38 @@ export function LoginForm({
           </div>
         </label>
 
+        {mode === "signup" && (
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm text-(--ink-soft)">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-(--line) text-(--accent) accent-(--accent) focus:ring-2 focus:ring-(--accent-soft)"
+            />
+            <span>
+              I agree to the{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-(--accent) underline-offset-2 transition hover:text-(--accent-deep) hover:underline"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-(--accent) underline-offset-2 transition hover:text-(--accent-deep) hover:underline"
+              >
+                Privacy Policy
+              </a>
+              .
+            </span>
+          </label>
+        )}
+
         {error && (
           <p className="rounded-xl border border-(--accent)/30 bg-(--accent-soft) px-4 py-2.5 text-sm text-(--accent-deep)">
             {error}
@@ -282,7 +325,7 @@ export function LoginForm({
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || (mode === "signup" && !agreed)}
           className="w-full rounded-full bg-(--accent) px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-(--accent-deep) disabled:opacity-50"
         >
           {pending
@@ -298,6 +341,7 @@ export function LoginForm({
         <button
           onClick={() => {
             setError(null);
+            setAgreed(false);
             setMode(mode === "signin" ? "signup" : "signin");
           }}
           className="font-semibold text-(--accent) transition hover:text-(--accent-deep)"

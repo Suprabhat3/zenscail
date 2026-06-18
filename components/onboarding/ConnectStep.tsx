@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createConnectLink } from "@/app/(app)/connect/actions";
+import { createAuthorizeUrl } from "@/app/(app)/connect/actions";
+import { CONNECT_PLUGINS, type ConnectPlugin } from "@/app/(app)/connect/plugins";
+
+const DONE_MESSAGE = "zenscail:connect-complete";
+
+const PLUGIN_LABEL: Record<ConnectPlugin, string> = {
+  gmail: "Gmail",
+  googlecalendar: "Google Calendar",
+};
 
 type Status = { id: string; label: string; connected: boolean };
 
@@ -24,7 +32,26 @@ export function ConnectStep({
 
   const refresh = useCallback(() => router.refresh(), [router]);
 
-  // Poll for completion while the Corsair tab is open.
+  // The next plugin to connect = first one in our order that isn't connected.
+  const nextPlugin = CONNECT_PLUGINS.find(
+    (id) => !statuses.find((s) => s.id === id)?.connected,
+  );
+  const stepIndex = nextPlugin ? CONNECT_PLUGINS.indexOf(nextPlugin) + 1 : 0;
+  const connectedCount = statuses.filter((s) => s.connected).length;
+
+  // The popup signals which plugin just connected; refresh so the UI advances.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== DONE_MESSAGE) return;
+      setPending(false);
+      refresh();
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [refresh]);
+
+  // Safety-net poll while the popup is open (e.g. closed early / no message).
   useEffect(() => {
     if (!pending || allConnected) return;
     const onVisible = () => {
@@ -38,18 +65,28 @@ export function ConnectStep({
     };
   }, [pending, allConnected, refresh]);
 
-  async function handleConnect() {
+  async function handleConnect(plugin: ConnectPlugin) {
     setLoading(true);
     setError(null);
+
+    const popup = window.open(
+      "about:blank",
+      "zenscail-connect",
+      "width=520,height=680,menubar=no,toolbar=no,location=no,status=no",
+    );
+
+    if (!popup) {
+      setError("Pop-up blocked. Allow pop-ups for this site and try again.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { url } = await createConnectLink();
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        setError("Pop-up blocked. Allow pop-ups for this site and try again.");
-        return;
-      }
+      const { url } = await createAuthorizeUrl(plugin);
+      popup.location.href = url;
       setPending(true);
     } catch {
+      popup.close();
       setError("Could not start connection. Try again.");
     } finally {
       setLoading(false);
@@ -109,15 +146,22 @@ export function ConnectStep({
         </div>
       )}
 
-      {pending && !allConnected && configured && (
+      {pending && nextPlugin && configured && (
         <div className="mx-auto mt-6 max-w-md rounded-2xl border border-(--gold)/40 bg-[#FBF3E3] px-5 py-4 text-left">
           <p className="text-sm font-medium text-[#7A5414]">
-            Finish authorizing in the new tab.
+            Authorize {PLUGIN_LABEL[nextPlugin]} in the pop-up window.
           </p>
           <p className="mt-1 text-xs text-[#8A6320]">
-            When you&apos;re done, return here — this updates automatically.
+            When you&apos;re done, this updates automatically.
           </p>
         </div>
+      )}
+
+      {!pending && nextPlugin && configured && connectedCount > 0 && (
+        <p className="mx-auto mt-6 max-w-md text-sm font-medium text-[#4D5C40]">
+          {PLUGIN_LABEL[CONNECT_PLUGINS[stepIndex - 2]]} connected — now connect{" "}
+          {PLUGIN_LABEL[nextPlugin]}.
+        </p>
       )}
 
       <div className="mx-auto mt-8 max-w-md">
@@ -129,14 +173,16 @@ export function ConnectStep({
           >
             Continue →
           </button>
-        ) : configured ? (
+        ) : configured && nextPlugin ? (
           <button
             type="button"
-            onClick={handleConnect}
+            onClick={() => handleConnect(nextPlugin)}
             disabled={loading}
             className="w-full rounded-full bg-(--ink) px-4 py-3 text-sm font-semibold text-(--bg) transition hover:bg-(--accent) disabled:opacity-60"
           >
-            {loading ? "Opening…" : "Connect with Google"}
+            {loading
+              ? "Opening…"
+              : `Connect ${PLUGIN_LABEL[nextPlugin]} (Step ${stepIndex} of ${CONNECT_PLUGINS.length})`}
           </button>
         ) : (
           <button
