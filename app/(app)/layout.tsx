@@ -27,30 +27,33 @@ export default async function AppLayout({
 }) {
   const session = await requireSession();
 
-  // First-run gate. New users (nothing set up) are sent through onboarding.
-  // Existing/legacy users with a connected mailbox are grandfathered in even
-  // if `onboardedAt` predates this feature.
+  // First-run gate. Access is granted on capability, not on a stale flag: a user
+  // may use the app only once they have a *working* AI path — a stored BYOK key
+  // or an active Cloud subscription. Connecting a mailbox alone is not enough
+  // (that's only the first onboarding step), so a user who cancels checkout and
+  // adds no key is routed back to finish setup instead of slipping through.
   const gateUser = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
-      onboardedAt: true,
       connectedEmail: true,
-      aiSettings: { select: { tier: true } },
+      aiSettings: { select: { tier: true, encryptedApiKey: true } },
       subscription: { select: { status: true } },
     },
   });
-  const onboarded = Boolean(gateUser?.onboardedAt) || Boolean(gateUser?.connectedEmail);
-  if (!onboarded) redirect("/onboarding");
 
-  // Cloud is fully gated: a user who completed onboarding on the Cloud tier must
-  // keep an active subscription. If it lapses, send them back to re-activate (or
-  // switch to BYOK). Legacy users (no `onboardedAt`) are exempt.
-  if (
-    gateUser?.onboardedAt &&
-    gateUser.aiSettings?.tier === "cloud" &&
-    !isActiveStatus(gateUser.subscription?.status)
-  ) {
-    redirect("/onboarding?step=subscribe");
+  // Step 1 — a mailbox must be connected before anything else.
+  if (!gateUser?.connectedEmail) redirect("/onboarding");
+
+  const tier = gateUser.aiSettings?.tier;
+  const hasByokKey = tier === "byok" && Boolean(gateUser.aiSettings?.encryptedApiKey);
+  const hasActiveCloud = isActiveStatus(gateUser.subscription?.status);
+
+  // No working AI path yet — send them to the right step to fix it. Users
+  // leaning Cloud (chose Cloud, or have a pending/lapsed subscription) go to
+  // checkout; everyone else picks an AI option.
+  if (!hasByokKey && !hasActiveCloud) {
+    const leansCloud = tier === "cloud" || Boolean(gateUser.subscription);
+    redirect(leansCloud ? "/onboarding?step=subscribe" : "/onboarding?step=ai");
   }
 
   const chatOptions = await getChatModelOptions(session.user.id);
@@ -58,11 +61,8 @@ export default async function AppLayout({
   const identity = await getAppIdentityForUser(session.user.id, session.user);
 
   // Always-visible plan indicator. Cloud only when the subscription is active;
-  // otherwise the user is running on their own key (or grandfathered legacy).
-  const plan: "cloud" | "byok" =
-    gateUser?.aiSettings?.tier === "cloud" && isActiveStatus(gateUser.subscription?.status)
-      ? "cloud"
-      : "byok";
+  // otherwise the user is running on their own key.
+  const plan: "cloud" | "byok" = hasActiveCloud ? "cloud" : "byok";
 
   return (
     <ChatProvider>
