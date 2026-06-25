@@ -136,12 +136,15 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ view?: string; date?: string; week?: string }>;
 }) {
-  const { view: viewParam, date: dateParam, week } = await searchParams;
+  // searchParams, session, and timezone are independent — resolve them together.
+  const [{ view: viewParam, date: dateParam, week }, session, tz] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getUserTimeZone(),
+  ]);
   const view: View =
     viewParam === "day" || viewParam === "month" ? viewParam : "week";
 
-  const session = await requireSession();
-  const tz = await getUserTimeZone();
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
 

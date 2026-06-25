@@ -331,9 +331,11 @@ export async function listInboxMessages(
     includeSpamTrash?: boolean;
     /** App user id — enables the local content cache (skips per-message gets). */
     userId?: string;
+    /** Gmail cursor for the next page (from a prior call's `nextPageToken`). */
+    pageToken?: string;
   } = {},
-): Promise<{ ok: boolean; messages: InboxMessage[] }> {
-  const { query, limit = 25, labelIds, includeSpamTrash, userId } = opts;
+): Promise<{ ok: boolean; messages: InboxMessage[]; nextPageToken?: string }> {
+  const { query, limit = 25, labelIds, includeSpamTrash, userId, pageToken } = opts;
   // The db cache has no searchable content columns, so we list message refs via
   // the API: Gmail `q` for search, or a label filter for folder views.
   const input: Record<string, unknown> = { maxResults: limit };
@@ -343,10 +345,12 @@ export async function listInboxMessages(
   if (labelIds && labelIds.length > 0) input.labelIds = labelIds;
   else if (labelIds === undefined && !query) input.labelIds = ["INBOX"];
   if (includeSpamTrash) input.includeSpamTrash = true;
-  const res = await t.run<{ messages?: { id?: string; threadId?: string }[] }>(
-    "gmail.api.messages.list",
-    input,
-  );
+  // Gmail pages via an opaque cursor (no offset support); pass it straight back.
+  if (pageToken) input.pageToken = pageToken;
+  const res = await t.run<{
+    messages?: { id?: string; threadId?: string }[];
+    nextPageToken?: string;
+  }>("gmail.api.messages.list", input);
   if (!res.success) return { ok: false, messages: [] };
 
   const refs: MessageRef[] = (res.data?.messages ?? [])
@@ -356,7 +360,7 @@ export async function listInboxMessages(
   const messages = (await hydrate(t, refs, userId)).sort(
     (a, b) => b.internalDate - a.internalDate,
   );
-  return { ok: true, messages };
+  return { ok: true, messages, nextPageToken: res.data?.nextPageToken };
 }
 
 /** A user-created Gmail label (system labels are filtered out). */
