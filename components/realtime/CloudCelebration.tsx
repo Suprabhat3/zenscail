@@ -37,10 +37,20 @@ function formatEnd(iso: string | null): string {
   }).format(new Date(iso));
 }
 
-export function CloudCelebration() {
+export function CloudCelebration({
+  immediate = false,
+  endsOnIso = null,
+}: {
+  /** Show the celebration at once (the page already knows the user is on Cloud,
+   *  e.g. the onboarding choice step for an already-upgraded user) — no status
+   *  round-trip, so the choice UI never flashes. */
+  immediate?: boolean;
+  /** currentEnd ISO to display in `immediate` mode. */
+  endsOnIso?: string | null;
+} = {}) {
   const router = useRouter();
-  const [endsOn, setEndsOn] = useState<string | null>(null);
-  const [show, setShow] = useState(false);
+  const [endsOn, setEndsOn] = useState<string | null>(endsOnIso);
+  const [show, setShow] = useState(immediate);
 
   const done = useRef(false);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -73,6 +83,14 @@ export function CloudCelebration() {
   }, [teardown]);
 
   useEffect(() => {
+    // Immediate mode: the server already decided to celebrate. Just mark it shown
+    // (so a reload won't replay) — no watching needed.
+    if (immediate) {
+      done.current = true;
+      void acknowledgeCloudWelcome();
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -109,7 +127,7 @@ export function CloudCelebration() {
       cancelled = true;
       teardown();
     };
-  }, [check, teardown]);
+  }, [check, teardown, immediate]);
 
   const enter = useCallback(() => {
     setShow(false);
