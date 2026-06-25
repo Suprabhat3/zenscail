@@ -30,6 +30,7 @@ import { refreshInbox, trashMessageAction, archiveMessageAction } from "./action
 import { catchUpSchedules } from "./schedule-actions";
 import { processDueFollowUps, listSurfacedFollowUps } from "@/lib/followUp";
 import { getUserTimeZone, formatInTZ, ymdInTZ } from "@/lib/timezone";
+import { isDemoMode, getDemoMessages, getDemoPriorities, DEMO_USER } from "@/lib/demo";
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, low: 2 };
 
@@ -130,10 +131,11 @@ export default async function MailPage({
   const folderKey = folderParam && FOLDERS[folderParam] ? folderParam : "inbox";
   const folder = FOLDERS[folderKey];
   const isInbox = folderKey === "inbox" && !labelId && !q;
-  const session = await requireSession();
-  const userId = session.user.id;
-  const tenantId = await ensureCorsairTenant(userId);
-  const t = corsairTenant(tenantId);
+  const demo = await isDemoMode();
+  const session = demo ? null : await requireSession();
+  const userId = session?.user.id ?? DEMO_USER.id;
+  let t: ReturnType<typeof corsairTenant> | null = null;
+  if (!demo) t = corsairTenant(await ensureCorsairTenant(userId));
 
   const showFollowUps = !snoozedView && !scheduledView;
 
@@ -141,7 +143,7 @@ export default async function MailPage({
   // sends, and resolve due follow-ups when the inbox opens, so the app works even
   // where cron cadence is coarse. Runs before the inbox list so woken snoozes
   // show up in it. Skipped while paging deeper to keep Newer/Older snappy.
-  if (firstPage) {
+  if (firstPage && !demo) {
     await Promise.all([
       catchUpSchedules().catch(() => {}),
       showFollowUps ? processDueFollowUps({ userId }).catch(() => {}) : Promise.resolve(),
@@ -151,10 +153,12 @@ export default async function MailPage({
   // Sidebar labels, layout cookie, timezone, and the follow-up banner list are
   // independent — fetch them concurrently instead of one await at a time.
   const [labelData, layoutCookie, tz, surfacedFollowUps] = await Promise.all([
-    getLabelData(t).catch(() => ({ custom: [], unread: {} })),
+    demo
+      ? Promise.resolve({ custom: [], unread: {} })
+      : getLabelData(t!).catch(() => ({ custom: [], unread: {} })),
     cookies(),
     getUserTimeZone(),
-    showFollowUps ? listSurfacedFollowUps(userId).catch(() => []) : Promise.resolve([]),
+    !demo && showFollowUps ? listSurfacedFollowUps(userId).catch(() => []) : Promise.resolve([]),
   ]);
   const activeLabel = labelId
     ? labelData.custom.find((l) => l.id === labelId)
@@ -190,7 +194,7 @@ export default async function MailPage({
 
   // --- Snoozed view ---
   let snoozed: { threadId: string; subject: string; snippet: string; until: Date }[] = [];
-  if (snoozedView) {
+  if (snoozedView && !demo) {
     const rows = await prisma.snoozedThread.findMany({
       where: { userId },
       orderBy: { snoozeUntil: "asc" },
@@ -198,7 +202,7 @@ export default async function MailPage({
     });
     snoozed = await Promise.all(
       rows.map(async (r) => {
-        const res = await getThread(t, r.threadId).catch(() => null);
+        const res = await getThread(t!, r.threadId).catch(() => null);
         const first = res?.success ? res.data.messages?.[0] : undefined;
         return {
           threadId: r.threadId,
@@ -220,7 +224,7 @@ export default async function MailPage({
     isUndo: boolean;
     error: string | null;
   }[] = [];
-  if (scheduledView) {
+  if (scheduledView && !demo) {
     scheduled = await prisma.scheduledSend.findMany({
       where: { userId, status: { in: ["pending", "sending", "failed"] } },
       orderBy: { sendAt: "asc" },
@@ -231,7 +235,7 @@ export default async function MailPage({
 
   // --- Local (DB-backed) drafts, shown atop the Drafts folder ---
   let localDrafts: LocalDraft[] = [];
-  if (folderKey === "drafts" && !q) {
+  if (folderKey === "drafts" && !q && !demo) {
     const rows = await prisma.draft.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
@@ -256,13 +260,16 @@ export default async function MailPage({
   let messages: Awaited<ReturnType<typeof listInboxMessages>>["messages"] = [];
   let priorities = new Map<string, RowMeta>();
   let nextPageToken: string | undefined;
-  if (!snoozedView && !scheduledView) {
+  if (demo) {
+    messages = getDemoMessages();
+    priorities = getDemoPriorities();
+  } else if (!snoozedView && !scheduledView) {
     const listOpts = q
       ? { query: q, limit: PAGE_SIZE, userId, pageToken }
       : labelId
         ? { labelIds: [labelId], limit: PAGE_SIZE, userId, pageToken }
         : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: PAGE_SIZE, userId, pageToken };
-    const result = await listInboxMessages(t, listOpts);
+    const result = await listInboxMessages(t!, listOpts);
     if (!result.ok) redirect("/connect");
     messages = result.messages;
     nextPageToken = result.nextPageToken;

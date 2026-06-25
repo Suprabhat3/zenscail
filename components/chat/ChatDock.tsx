@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { useChatDock } from "./ChatProvider";
+import { useDemo } from "@/components/demo/DemoProvider";
+import { DEMO_CHAT_REPLY } from "@/lib/demo-shared";
 import { Markdown } from "./Markdown";
 import { MicButton } from "@/components/voice/MicButton";
 import { useToast } from "@/components/ui/Toast";
@@ -118,6 +120,7 @@ function messageText(m: UIMessage): string {
 
 export function ChatDock({ tier, provider, defaultModel, models }: Props) {
   const { open, setOpen, seed, consumeSeed } = useChatDock();
+  const { active: demo, requireLogin } = useDemo();
   const { toast } = useToast();
   const pathname = usePathname();
   const router = useRouter();
@@ -172,11 +175,25 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
+      // Demo tour: don't hit the (auth-gated) model. Echo the message and reply
+      // with a friendly nudge, then surface the login prompt.
+      if (demo) {
+        setMessages((prev) => [
+          ...prev,
+          { id: newId(), role: "user", parts: [{ type: "text", text: trimmed }] },
+          { id: newId(), role: "assistant", parts: [{ type: "text", text: DEMO_CHAT_REPLY }] },
+        ] as UIMessage[]);
+        setInput("");
+        requireLogin(
+          "Sign in to chat with the assistant — it reads your mail, drafts replies, and runs your calendar.",
+        );
+        return;
+      }
       if (!convIdRef.current) setConversation(newId());
       sendMessage({ text: trimmed }, { body: { model } });
       setInput("");
     },
-    [sendMessage, model, setConversation],
+    [sendMessage, model, setConversation, demo, requireLogin, setMessages],
   );
 
   const loadConversation = useCallback(
@@ -238,7 +255,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
   // First time the dock opens, restore the most recent conversation (and load
   // the history list); falls back to a fresh conversation if there are none.
   useEffect(() => {
-    if (!open || restoredRef.current) return;
+    if (!open || restoredRef.current || demo) return;
     restoredRef.current = true;
     void (async () => {
       const items = await listConversations();
@@ -252,7 +269,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
       if (items.length > 0) await loadConversation(items[0].id);
       else setConversation(newId());
     })();
-  }, [open, loadConversation, setConversation]);
+  }, [open, loadConversation, setConversation, demo]);
 
   // A prompt queued from elsewhere in the UI (e.g. the quick-add bar or the
   // dashboard's "Ask about this brief"). A hand-off always starts its OWN fresh

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BriefActionItem, BriefItemStates } from "@/lib/ai/brief";
 import { setBriefItemStateAction } from "@/app/(app)/dashboard/actions";
+import { useDemo } from "@/components/demo/DemoProvider";
 import { AskItemButton } from "./BriefChatButtons";
 import { useNow } from "./useNow";
 
@@ -152,11 +153,16 @@ export function BriefActionItems({
   initialStates: BriefItemStates;
 }) {
   const router = useRouter();
+  const { active: demo, requireLogin } = useDemo();
   const [states, setStates] = useState<BriefItemStates>(initialStates);
   const [, startTransition] = useTransition();
   const now = useNow();
 
   function commit(key: string, next: BriefItemStates[string] | null) {
+    if (demo) {
+      requireLogin("Sign in to check off and snooze the things on your plate.");
+      return;
+    }
     setStates((prev) => {
       const copy = { ...prev };
       if (next === null) delete copy[key];

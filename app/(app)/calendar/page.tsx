@@ -28,6 +28,7 @@ import {
   addMonthsMs,
 } from "@/lib/timezone";
 import { refreshCalendar, createInstantMeet } from "./actions";
+import { isDemoMode, getDemoEvents } from "@/lib/demo";
 
 export const metadata = { title: "Calendar — ZenScail" };
 
@@ -136,17 +137,15 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ view?: string; date?: string; week?: string }>;
 }) {
+  const demo = await isDemoMode();
   // searchParams, session, and timezone are independent — resolve them together.
   const [{ view: viewParam, date: dateParam, week }, session, tz] = await Promise.all([
     searchParams,
-    requireSession(),
+    demo ? Promise.resolve(null) : requireSession(),
     getUserTimeZone(),
   ]);
   const view: View =
     viewParam === "day" || viewParam === "month" ? viewParam : "week";
-
-  const tenantId = await ensureCorsairTenant(session.user.id);
-  const t = corsairTenant(tenantId);
 
   // Anchor day as a viewer-local-midnight epoch — `?date=YYYY-MM-DD`, with
   // back-compat for old `?week=offset` links.
@@ -174,11 +173,21 @@ export default async function CalendarPage({
     gridStartMs = rangeStartMs;
   }
 
-  const [{ ok, messages: events }, calendars] = await Promise.all([
-    listEvents(t, { rangeStart: new Date(rangeStartMs), rangeEnd: new Date(rangeEndMs) }),
-    listCalendars(t).catch(() => []),
-  ]);
-  if (!ok) redirect("/connect");
+  let events: CachedEvent[];
+  let calendars: Awaited<ReturnType<typeof listCalendars>> = [];
+  if (demo) {
+    events = getDemoEvents();
+  } else {
+    const tenantId = await ensureCorsairTenant(session!.user.id);
+    const t = corsairTenant(tenantId);
+    const [eventsRes, cals] = await Promise.all([
+      listEvents(t, { rangeStart: new Date(rangeStartMs), rangeEnd: new Date(rangeEndMs) }),
+      listCalendars(t).catch(() => []),
+    ]);
+    if (!eventsRes.ok) redirect("/connect");
+    events = eventsRes.messages;
+    calendars = cals;
+  }
 
   const today = ymdInTZ(new Date().getTime(), tz);
 

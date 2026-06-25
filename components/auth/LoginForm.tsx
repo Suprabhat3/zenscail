@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { DEMO_COOKIE } from "@/lib/demo-shared";
 
 const inputClass =
   "mt-1.5 w-full rounded-full border border-(--line) bg-(--paper) px-4 py-2.5 text-sm text-(--ink) placeholder:text-(--muted) transition focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)";
@@ -49,6 +50,17 @@ export function LoginForm({
     return /verif/i.test(message ?? "");
   }
 
+  function startDemo() {
+    // Flag an anonymous tour session, then drop straight into the app. Read-only:
+    // the cookie is ignored the moment a real session exists (see lib/demo.ts).
+    document.cookie = `${DEMO_COOKIE}=1; path=/; max-age=86400; samesite=lax`;
+    router.push("/dashboard");
+  }
+
+  function clearDemo() {
+    document.cookie = `${DEMO_COOKIE}=; path=/; max-age=0; samesite=lax`;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -93,6 +105,7 @@ export function LoginForm({
       return;
     }
     setPending(false);
+    clearDemo();
     router.push(next);
   }
 
@@ -108,6 +121,7 @@ export function LoginForm({
       return;
     }
     // autoSignInAfterVerification creates the session for us.
+    clearDemo();
     router.push(next);
   }
 
@@ -349,6 +363,23 @@ export function LoginForm({
           {mode === "signin" ? "Sign up free" : "Sign in"}
         </button>
       </p>
+
+      {/* Tour mode — explore the whole app with sample data, no account needed. */}
+      <div className="mt-6 flex items-center gap-3 text-xs text-(--muted)">
+        <span className="h-px flex-1 bg-(--line-soft)" />
+        just looking?
+        <span className="h-px flex-1 bg-(--line-soft)" />
+      </div>
+      <button
+        type="button"
+        onClick={startDemo}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-(--accent)/40 bg-(--accent-soft) px-3 py-2.5 text-sm font-semibold text-(--accent-deep) transition hover:border-(--accent) hover:bg-(--accent-soft)/70"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+        </svg>
+        Explore the demo — no signup
+      </button>
     </div>
   );
 }

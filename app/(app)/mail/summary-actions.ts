@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getEmailSummaryFor, type EmailSummaryData } from "@/lib/ai/summary";
+import { isDemoMode, getDemoSummary } from "@/lib/demo";
 
 /**
  * Fetch (or lazily generate + cache) the one-glance summary for an inbox
@@ -13,6 +14,8 @@ import { getEmailSummaryFor, type EmailSummaryData } from "@/lib/ai/summary";
  */
 export async function getEmailSummary(messageId: string): Promise<EmailSummaryData | null> {
   if (!messageId) return null;
+  // Demo tour: hover summaries come straight from the dummy dataset.
+  if (await isDemoMode()) return getDemoSummary(messageId);
   try {
     const session = await requireSession();
     const tenantId = await ensureCorsairTenant(session.user.id);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { sendActivatedOnce } from "@/lib/email/send";
-import { getTodayBrief, type BriefEvent } from "@/lib/ai/brief";
+import { getTodayBrief, type Brief, type BriefEvent } from "@/lib/ai/brief";
 import { Markdown } from "@/components/chat/Markdown";
 import { GenerateBrief } from "@/components/dashboard/GenerateBrief";
 import { BriefActionItems } from "@/components/dashboard/BriefActionItems";
@@ -11,6 +11,7 @@ import {
   RefreshBriefButton,
 } from "@/components/dashboard/BriefChatButtons";
 import { getUserTimeZone, formatInTZ, partsInTZ } from "@/lib/timezone";
+import { isDemoMode, getDemoBrief, DEMO_USER } from "@/lib/demo";
 
 export const metadata = { title: "Today — ZenScail" };
 export const dynamic = "force-dynamic";
@@ -73,6 +74,15 @@ function TodayTimeline({ events, tz }: { events: BriefEvent[]; tz: string }) {
 }
 
 export default async function DashboardPage() {
+  const demo = await isDemoMode();
+
+  if (demo) {
+    const tz = await getUserTimeZone();
+    const brief = getDemoBrief();
+    const firstName = DEMO_USER.name.split(" ")[0];
+    return <DashboardView brief={brief} firstName={firstName} tz={tz} />;
+  }
+
   const session = await requireSession();
 
   // First time a fully-onboarded user reaches the dashboard, send the
@@ -87,6 +97,18 @@ export default async function DashboardPage() {
   const tz = await getUserTimeZone();
   const brief = await getTodayBrief(session.user.id);
   const firstName = session.user.name?.split(" ")[0] || "there";
+  return <DashboardView brief={brief} firstName={firstName} tz={tz} />;
+}
+
+function DashboardView({
+  brief,
+  firstName,
+  tz,
+}: {
+  brief: Brief | null;
+  firstName: string;
+  tz: string;
+}) {
   const today = formatInTZ(new Date().getTime(), tz, {
     weekday: "long",
     month: "long",

@@ -235,9 +235,13 @@ export default function TermsPage() {
         <h2>Third-party services</h2>
         <p>
           The Service integrates with third parties such as Google and your chosen AI
-          provider. Your use of those services is subject to their terms and policies. We
-          aren&rsquo;t responsible for third-party services, and their availability is
-          outside our control.
+          provider. To connect to those services and let our AI assistant act on your
+          behalf, ZenScail relies on <strong>Corsair</strong> (corsair.dev), an
+          integration and agentic-tooling platform that manages the authorised connection
+          to your accounts and executes the email and calendar operations you request.
+          Your use of Corsair, Google, and any AI provider is subject to their respective
+          terms and policies. We aren&rsquo;t responsible for third-party services, and
+          their availability is outside our control.
         </p>
       </section>
 
