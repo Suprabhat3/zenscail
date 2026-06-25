@@ -8,6 +8,7 @@ import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
 import { listInboxMessages, getThread, header, getLabelData } from "@/lib/gmail";
 import { MailSidebar, MailFolderChips } from "@/components/mail/MailSidebar";
+import { MailNavProvider, MailBody } from "@/components/mail/MailNav";
 import {
   classifyMessages,
   getPriorities,
@@ -283,6 +284,7 @@ export default async function MailPage({
         }`;
 
   return (
+    <MailNavProvider>
     <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <MailSidebar custom={labelData.custom} unread={labelData.unread} />
       <div className="min-w-0 flex-1">
@@ -389,6 +391,7 @@ export default async function MailPage({
       {folderKey === "drafts" && <LocalDraftsList drafts={localDrafts} />}
 
       {/* Body */}
+      <MailBody>
       {snoozedView ? (
         <SnoozedList snoozed={snoozed} formatWhen={(d) => formatWhen(d, tz)} />
       ) : scheduledView ? (
@@ -448,8 +451,10 @@ export default async function MailPage({
           <InboxTip />
         </>
       )}
+      </MailBody>
       </div>
     </div>
+    </MailNavProvider>
   );
 }
 

@@ -1,35 +1,9 @@
 "use client";
 
-import Link, { useLinkStatus } from "next/link";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { GmailLabel } from "@/lib/gmail";
-import { BrandLoader } from "@/components/app/BrandLoader";
-
-const NAV_LOADER_MESSAGES = [
-  "Gathering your conversations…",
-  "Reading what landed since you left…",
-  "Sorting signal from the noise…",
-  "Surfacing what needs you first…",
-];
-
-/**
- * Full-bleed loading screen for in-place folder switches. Switching folders is
- * a searchParams-only change on the same /mail segment, so Next keeps the stale
- * page mounted and never falls back to loading.tsx. useLinkStatus gives us the
- * pending state per Link (only the last-clicked link reports pending), letting
- * us show the same BrandLoader the inbox shows on first load.
- *
- * Must be rendered as a descendant of the <Link> whose status it tracks.
- */
-function NavLoader({ label }: { label: string }) {
-  const { pending } = useLinkStatus();
-  if (!pending) return null;
-  return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-(--bg)">
-      <BrandLoader title={`Opening ${label}`} messages={NAV_LOADER_MESSAGES} />
-    </div>
-  );
-}
+import { FolderNavReporter } from "./MailNav";
 
 type IconName =
   | "inbox"
@@ -211,7 +185,7 @@ export function MailSidebar({
               {count > 0 && (
                 <span className="shrink-0 text-xs font-semibold tabular-nums">{count}</span>
               )}
-              <NavLoader label={f.label} />
+              <FolderNavReporter id={f.href} label={f.label} />
             </Link>
           );
         })}
@@ -242,7 +216,7 @@ export function MailSidebar({
                   {l.unread > 0 && (
                     <span className="shrink-0 text-xs font-semibold tabular-nums">{l.unread}</span>
                   )}
-                  <NavLoader label={l.name} />
+                  <FolderNavReporter id={`label-${l.id}`} label={l.name} />
                 </Link>
               );
             })}
@@ -299,7 +273,7 @@ export function MailFolderChips({
             </span>
             {f.label}
             {count > 0 && <span className="text-xs font-semibold tabular-nums">{count}</span>}
-            <NavLoader label={f.label} />
+            <FolderNavReporter id={`chip-${f.href}`} label={f.label} />
           </Link>
         );
       })}
@@ -320,7 +294,7 @@ export function MailFolderChips({
             </span>
             {l.name}
             {l.unread > 0 && <span className="text-xs font-semibold tabular-nums">{l.unread}</span>}
-            <NavLoader label={l.name} />
+            <FolderNavReporter id={`chip-label-${l.id}`} label={l.name} />
           </Link>
         );
       })}
