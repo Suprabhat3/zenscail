@@ -413,7 +413,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
               {messages.map((m) => (
                 <div key={m.id} className={m.role === "user" ? "flex justify-end" : "group flex flex-col"}>
                   <div
-                    className={`min-w-0 max-w-[88%] overflow-hidden rounded-2xl px-4 py-3 text-sm [overflow-wrap:anywhere] ${
+                    className={`min-w-0 max-w-[88%] overflow-hidden rounded-2xl px-4 py-3 text-sm wrap-anywhere ${
                       m.role === "user"
                         ? "self-end bg-(--ink) text-(--bg)"
                         : "border border-(--line-soft) bg-(--bg) text-(--ink-soft)"
@@ -422,7 +422,7 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
                     {m.parts.map((part, i) => {
                       if (part.type === "text") {
                         return m.role === "user" ? (
-                          <p key={i} className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">
+                          <p key={i} className="whitespace-pre-wrap leading-relaxed wrap-anywhere">
                             {part.text}
                           </p>
                         ) : (
