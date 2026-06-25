@@ -102,7 +102,7 @@ export function extractBodies(payload: GmailPayload | undefined): {
 export type MessageAttachment = {
   filename: string;
   mimeType: string;
-  /** Gmail attachment id, fetched on demand via getAttachment. */
+  /** Gmail attachment id (used to identify the part; bytes live in Gmail). */
   attachmentId: string;
   /** Size in bytes (from the part body), 0 when unknown. */
   size: number;
@@ -500,26 +500,6 @@ export async function getMessage(t: TenantScope, id: string) {
   return t.run<GmailMessage>("gmail.api.messages.get", { id, format: "full" });
 }
 
-/**
- * Fetch the raw bytes of one attachment on a received message. Gmail returns
- * the data base64url-encoded; we decode it to a Buffer for streaming back to
- * the browser. Returns null when the tenant isn't connected or the id is bad.
- */
-export async function getAttachment(
-  t: TenantScope,
-  messageId: string,
-  attachmentId: string,
-): Promise<Buffer | null> {
-  const res = await t.run<{ data?: string; size?: number }>(
-    "gmail.api.messages.attachments.get",
-    { messageId, id: attachmentId },
-  );
-  if (!res.success || !res.data?.data) return null;
-  return Buffer.from(
-    res.data.data.replace(/-/g, "+").replace(/_/g, "/"),
-    "base64",
-  );
-}
 
 export async function sendEmail(
   t: TenantScope,

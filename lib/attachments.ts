@@ -4,16 +4,22 @@ import { z } from "zod";
  * Shared limits + schema for outgoing email attachments. Imported by both the
  * client compose UI (to enforce the cap before upload and render a friendly
  * error) and the server actions (to re-validate untrusted input at the
- * boundary). Bytes ride along with the ScheduledSend row, so the cap also keeps
- * the queued payload — and the resulting Gmail raw message — within Gmail's
- * ~35MB send ceiling once base64 inflation is accounted for.
+ * boundary).
+ *
+ * NOTE on the small cap: outgoing mail is sent through Corsair's `/run` proxy,
+ * whose request body is capped at ~100KB. The attachment bytes ride inside the
+ * base64 `raw` message, which roughly doubles their size on the wire, so the
+ * usable ceiling for all attachments combined is ~40KB. Anything larger is
+ * rejected by Corsair with a 413 before it ever reaches Gmail. (Lifting this
+ * needs a direct Gmail upload path that bypasses Corsair — see the attachment
+ * notes.) The UI surfaces this limit explicitly.
  */
 
 /** Hard cap on the combined size of all attachments on a single email. */
-export const MAX_TOTAL_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20 MB
+export const MAX_TOTAL_ATTACHMENT_BYTES = 40 * 1024; // 40 KB (Corsair /run body limit)
 
 /** Human-readable form of the cap, for UI copy and error messages. */
-export const MAX_TOTAL_ATTACHMENT_LABEL = "20 MB";
+export const MAX_TOTAL_ATTACHMENT_LABEL = "40 KB";
 
 /** Format a byte count for chips/errors, e.g. "1.4 MB", "812 KB". */
 export function formatBytes(bytes: number): string {

@@ -75,10 +75,12 @@ export function AttachmentField() {
           </svg>
           Attach
         </button>
-        {files.length > 0 && (
+        {files.length > 0 ? (
           <span className="text-xs text-(--muted)">
             {files.length} file{files.length === 1 ? "" : "s"} · {formatBytes(totalBytes)} of {MAX_TOTAL_ATTACHMENT_LABEL}
           </span>
+        ) : (
+          <span className="text-xs text-(--muted)">Small files only — up to {MAX_TOTAL_ATTACHMENT_LABEL}</span>
         )}
         <input
           ref={inputRef}

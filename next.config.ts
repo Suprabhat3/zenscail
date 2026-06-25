@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // Compose sends carry attachment bytes (base64) as a Server Action arg.
-      // The default 1MB cap would reject them; allow up to the 20MB total
-      // attachment limit plus base64 (~33%) inflation and body overhead.
-      bodySizeLimit: "30mb",
+      // Attachments are capped at 40KB (Corsair's /run body limit), so the
+      // payload stays small — a modest bump over the 1MB default is plenty.
+      bodySizeLimit: "2mb",
     },
   },
 };

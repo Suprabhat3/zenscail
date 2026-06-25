@@ -207,17 +207,22 @@ export async function cancelScheduledSend(id: number): Promise<{ canceled: boole
 }
 
 /** Flush one pending send immediately (called by the client when the undo
- * window elapses, so we don't wait for the coarse cron). Ownership-checked. */
-export async function flushScheduledSend(id: number): Promise<void> {
+ * window elapses, so we don't wait for the coarse cron). Ownership-checked.
+ * Returns the delivery outcome so the client can surface a failed send instead
+ * of silently reporting success. */
+export async function flushScheduledSend(
+  id: number,
+): Promise<"sent" | "failed" | "skipped"> {
   const rowId = rowIdSchema.parse(id);
   const session = await requireSession();
   const row = await prisma.scheduledSend.findFirst({
     where: { id: rowId, userId: session.user.id },
     select: { id: true },
   });
-  if (!row) return;
-  await deliverScheduledSend(rowId);
+  if (!row) return "skipped";
+  const outcome = await deliverScheduledSend(rowId);
   revalidatePath("/mail");
+  return outcome;
 }
 
 /**

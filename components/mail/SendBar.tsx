@@ -121,7 +121,12 @@ export function SendBar({
       if (secs === 0) {
         // Undo disabled — send immediately.
         const { id } = await deferSend(payload, 0);
-        await flushScheduledSend(id);
+        const outcome = await flushScheduledSend(id);
+        if (outcome !== "sent") {
+          toast("Couldn’t send your message — please try again. Your draft is kept.");
+          setBusy(false);
+          return;
+        }
         await dropDraft();
         attachments?.clear();
         toast("Sent");
@@ -145,7 +150,14 @@ export function SendBar({
         },
         onExpire: async () => {
           if (undone) return;
-          await flushScheduledSend(id).catch(() => {});
+          const outcome = await flushScheduledSend(id).catch(
+            () => "failed" as const,
+          );
+          if (outcome !== "sent") {
+            toast("Couldn’t send your message — it’s still in your drafts.");
+            setBusy(false);
+            return;
+          }
           await dropDraft();
           attachments?.clear();
           router.push(successHref);

@@ -112,23 +112,29 @@ function MessageCard({
               <ul className="flex flex-wrap gap-2">
                 {attachments.map((a) => (
                   <li key={a.attachmentId}>
+                    {/* Downloading bytes requires a Gmail op Corsair doesn't
+                        expose, so we link out to the message in Gmail where the
+                        attachment can be opened/downloaded directly. */}
                     <a
-                      href={`/mail/attachment?message=${encodeURIComponent(message.id!)}&attachment=${encodeURIComponent(a.attachmentId)}&filename=${encodeURIComponent(a.filename)}&mime=${encodeURIComponent(a.mimeType)}`}
-                      download={a.filename}
+                      href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(message.id!)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open “${a.filename}” in Gmail`}
                       className="flex items-center gap-2 rounded-lg border border-(--line) bg-(--bg) px-3 py-2 text-xs text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 text-(--muted)">
                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                       </svg>
-                      <span className="max-w-56 truncate" title={a.filename}>
-                        {a.filename}
-                      </span>
+                      <span className="max-w-56 truncate">{a.filename}</span>
                       {a.size > 0 && (
                         <span className="text-(--muted)">{formatBytes(a.size)}</span>
                       )}
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 text-(--muted)">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                      </svg>
+                      <span className="ml-0.5 flex items-center gap-1 text-(--muted)">
+                        <span>Open in Gmail</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+                          <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        </svg>
+                      </span>
                     </a>
                   </li>
                 ))}
