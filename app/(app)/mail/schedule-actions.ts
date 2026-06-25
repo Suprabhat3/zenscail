@@ -12,6 +12,7 @@ import { deliverScheduledSend } from "@/lib/scheduledSend";
 import { wakeDueSnoozes } from "@/lib/snooze";
 import { publish } from "@/lib/realtime";
 import { clampedInt } from "@/lib/validation";
+import { outgoingAttachmentsSchema } from "@/lib/attachments";
 
 /** A future instant parsed from an ISO string — rejects invalid or past times. */
 const futureDate = (message: string) =>
@@ -52,10 +53,32 @@ const SendPayloadSchema = z.object({
     .string()
     .optional()
     .transform((s) => s?.trim() || undefined),
+  // Optional file attachments (base64) carried with the queued send.
+  attachments: outgoingAttachmentsSchema.optional(),
 });
 
 /** The shape callers hand us (pre-validation). */
 type SendPayload = z.input<typeof SendPayloadSchema>;
+
+/** Persist a send's attachment rows (base64 → bytea) for a created row. */
+async function createAttachmentRows(
+  scheduledSendId: number,
+  attachments: z.infer<typeof outgoingAttachmentsSchema> | undefined,
+): Promise<void> {
+  if (!attachments?.length) return;
+  await prisma.scheduledSendAttachment.createMany({
+    data: attachments.map((a) => {
+      const content = Buffer.from(a.dataBase64, "base64");
+      return {
+        scheduledSendId,
+        filename: a.filename,
+        mimeType: a.mimeType,
+        content,
+        size: content.length,
+      };
+    }),
+  });
+}
 
 // --- Snooze ---
 
@@ -131,6 +154,7 @@ export async function deferSend(
     },
     select: { id: true },
   });
+  await createAttachmentRows(row.id, data.attachments);
   return { id: row.id };
 }
 
@@ -157,6 +181,7 @@ export async function scheduleSend(
     },
     select: { id: true },
   });
+  await createAttachmentRows(row.id, data.attachments);
   revalidatePath("/mail");
   return { id: row.id };
 }
@@ -170,6 +195,13 @@ export async function cancelScheduledSend(id: number): Promise<{ canceled: boole
     where: { id: rowId, userId: session.user.id, status: "pending" },
     data: { status: "canceled" },
   });
+  // Free the queued attachment bytes — the row lingers (status canceled) so the
+  // onDelete cascade never fires for it.
+  if (res.count > 0) {
+    await prisma.scheduledSendAttachment.deleteMany({
+      where: { scheduledSendId: rowId },
+    });
+  }
   revalidatePath("/mail");
   return { canceled: res.count > 0 };
 }

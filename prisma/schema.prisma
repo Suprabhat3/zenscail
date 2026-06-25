@@ -225,10 +225,31 @@ model ScheduledSend {
   isUndo    Boolean   @default(false) @map("is_undo")
   createdAt DateTime  @default(now()) @map("created_at")
   sentAt    DateTime? @map("sent_at")
+  // File attachments to include in the outgoing message. Carried here (not on
+  // the in-memory compose session) because the send is delivered server-side,
+  // detached from the browser. Cleared once the row is sent or canceled.
+  attachments ScheduledSendAttachment[]
 
   @@index([userId, status, sendAt])
   @@index([status, sendAt])
   @@map("scheduled_send")
+}
+
+/// One outgoing attachment queued with a ScheduledSend. `content` holds the raw
+/// bytes (bytea); `deliverScheduledSend` reads them to build the multipart/mixed
+/// MIME, then deletes these rows. Bounded by the compose-time total-size cap.
+model ScheduledSendAttachment {
+  id              Int           @id @default(autoincrement())
+  scheduledSendId Int           @map("scheduled_send_id")
+  scheduledSend   ScheduledSend @relation(fields: [scheduledSendId], references: [id], onDelete: Cascade)
+  filename        String
+  mimeType        String        @map("mime_type")
+  content         Bytes
+  size            Int
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([scheduledSendId])
+  @@map("scheduled_send_attachment")
 }
 
 model Draft {

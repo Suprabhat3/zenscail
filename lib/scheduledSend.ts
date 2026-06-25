@@ -23,7 +23,10 @@ export async function deliverScheduledSend(id: number): Promise<
   });
   if (claim.count === 0) return "skipped";
 
-  const row = await prisma.scheduledSend.findUnique({ where: { id } });
+  const row = await prisma.scheduledSend.findUnique({
+    where: { id },
+    include: { attachments: true },
+  });
   if (!row) return "skipped";
 
   try {
@@ -42,6 +45,11 @@ export async function deliverScheduledSend(id: number): Promise<
       threadId: row.threadId ?? undefined,
       inReplyTo: row.inReplyTo ?? undefined,
       references: row.inReplyTo ?? undefined,
+      attachments: row.attachments.map((a) => ({
+        filename: a.filename,
+        mimeType: a.mimeType,
+        content: Buffer.from(a.content),
+      })),
     });
     if (!result.success) throw new Error("Gmail send returned success:false");
 
@@ -49,6 +57,13 @@ export async function deliverScheduledSend(id: number): Promise<
       where: { id },
       data: { status: "sent", sentAt: new Date(), error: null },
     });
+    // Bytes are no longer needed once sent — free them, keeping the row for the
+    // outbox/sent history.
+    if (row.attachments.length > 0) {
+      await prisma.scheduledSendAttachment
+        .deleteMany({ where: { scheduledSendId: id } })
+        .catch(() => {});
+    }
     // Nudge any open mail view to refresh (the sent message lands in the thread).
     publish(row.userId, { plugin: "gmail", type: "scheduled-send", at: Date.now() });
     return "sent";

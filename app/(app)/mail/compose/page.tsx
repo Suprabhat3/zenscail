@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { RecipientField } from "@/components/mail/RecipientField";
 import { SendBar } from "@/components/mail/SendBar";
 import { RichComposer } from "@/components/mail/RichComposer";
+import { AttachmentsProvider } from "@/components/mail/AttachmentsContext";
+import { AttachmentField } from "@/components/mail/AttachmentField";
 
 export const metadata = { title: "Compose — ZenScail" };
 
@@ -61,6 +63,7 @@ export default async function ComposePage({
       </div>
 
       <form className="mt-6 overflow-hidden rounded-3xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
+        <AttachmentsProvider>
         <div className="px-5 pt-4">
           {/* To — autocompleting recipient field */}
           <div className="flex items-start gap-3 border-b border-(--line-soft) pb-3">
@@ -95,6 +98,11 @@ export default async function ComposePage({
           toName="to"
         />
 
+        {/* Attachments */}
+        <div className="border-t border-(--line-soft) px-5 py-3">
+          <AttachmentField />
+        </div>
+
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-(--line-soft) bg-(--bg)/40 px-5 py-3.5">
           <div className="flex items-center gap-2">
@@ -110,6 +118,7 @@ export default async function ComposePage({
             Sends from your connected Gmail · Undo for a few seconds after sending.
           </p>
         </div>
+        </AttachmentsProvider>
       </form>
     </div>
   );
