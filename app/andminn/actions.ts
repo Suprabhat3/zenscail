@@ -7,6 +7,7 @@ import {
   requireAdmin,
 } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
+import { publish } from "@/lib/realtime";
 import { isActiveStatus } from "@/lib/subscription";
 
 const userIdSchema = z.string().min(1);
@@ -22,8 +23,11 @@ export async function grantCloudAccess(formData: FormData) {
   });
   if (!user) return;
 
+  // Admin grants are a one-month trial of Cloud — not a year. When it lapses
+  // the date-aware access check (lib/subscription) revokes access automatically;
+  // the user re-subscribes from /settings/billing.
   const currentEnd = new Date();
-  currentEnd.setFullYear(currentEnd.getFullYear() + 1);
+  currentEnd.setMonth(currentEnd.getMonth() + 1);
 
   await prisma.$transaction([
     prisma.subscription.upsert({
@@ -34,11 +38,14 @@ export async function grantCloudAccess(formData: FormData) {
         status: "active",
         currentEnd,
         cancelAtPeriodEnd: false,
+        cloudCelebratedAt: null,
       },
       update: {
         status: "active",
         currentEnd,
         cancelAtPeriodEnd: false,
+        // Re-arm the celebration so a re-grant is celebrated again.
+        cloudCelebratedAt: null,
       },
     }),
     prisma.userAiSettings.upsert({
@@ -55,6 +62,11 @@ export async function grantCloudAccess(formData: FormData) {
         ]
       : []),
   ]);
+
+  // Push to the user's open tabs (onboarding/app) so the celebration fires in
+  // ~1s without a manual refresh. In-process bus — reliable on the single-
+  // instance deploy; the client's poll fallback covers the rare miss.
+  publish(userId, { channel: "subscription", type: "granted", at: Date.now() });
 
   revalidatePath("/andminn");
 }

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhookSignature } from "@/lib/razorpay";
+import { isActiveStatus } from "@/lib/subscription";
+import { publish } from "@/lib/realtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -57,13 +59,34 @@ export async function POST(req: Request) {
   const currentEnd = sub.current_end ? new Date(sub.current_end * 1000) : null;
 
   try {
+    const existing = await prisma.subscription.findFirst({
+      where: { razorpaySubscriptionId: sub.id },
+      select: { userId: true, status: true },
+    });
+    if (!existing) return Response.json({ ok: true });
+
+    // Newly active (e.g. the first charge confirmed asynchronously) → re-arm and
+    // push so the upgrade celebration plays in the user's open tab. Only on the
+    // transition, so routine renewals of an already-active sub don't re-fire it.
+    const justActivated =
+      isActiveStatus(sub.status) && !isActiveStatus(existing.status);
+
     await prisma.subscription.updateMany({
       where: { razorpaySubscriptionId: sub.id },
       data: {
         status: sub.status ?? undefined,
         ...(currentEnd ? { currentEnd } : {}),
+        ...(justActivated ? { cloudCelebratedAt: null } : {}),
       },
     });
+
+    if (justActivated) {
+      publish(existing.userId, {
+        channel: "subscription",
+        type: "granted",
+        at: Date.now(),
+      });
+    }
   } catch (err) {
     console.error("razorpay webhook: failed to update subscription", err);
     // Still ack — a 500 makes Razorpay retry; the next event will reconcile.

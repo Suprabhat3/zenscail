@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { isActiveStatus } from "@/lib/subscription";
+import { hasCloudAccess } from "@/lib/subscription";
 import { getChatModelOptions } from "@/lib/ai/registry";
 import { getAppIdentityForUser } from "@/lib/identity";
 import { AppNav } from "@/components/app/AppNav";
@@ -11,6 +11,7 @@ import { UserMenu } from "@/components/app/UserMenu";
 import { PlanBadge } from "@/components/app/PlanBadge";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
 import { LiveUpdates } from "@/components/realtime/LiveUpdates";
+import { CloudCelebration } from "@/components/realtime/CloudCelebration";
 import { ChatProvider } from "@/components/chat/ChatProvider";
 import { ChatDock } from "@/components/chat/ChatDock";
 import { ChatLauncher } from "@/components/chat/ChatLauncher";
@@ -38,7 +39,7 @@ export default async function AppLayout({
     select: {
       connectedEmail: true,
       aiSettings: { select: { tier: true, encryptedApiKey: true } },
-      subscription: { select: { status: true } },
+      subscription: { select: { status: true, currentEnd: true } },
     },
   });
 
@@ -47,7 +48,7 @@ export default async function AppLayout({
 
   const tier = gateUser.aiSettings?.tier;
   const hasByokKey = tier === "byok" && Boolean(gateUser.aiSettings?.encryptedApiKey);
-  const hasActiveCloud = isActiveStatus(gateUser.subscription?.status);
+  const hasActiveCloud = hasCloudAccess(gateUser.subscription);
 
   // No working AI path yet — send them to the right step to fix it. Users
   // leaning Cloud (chose Cloud, or have a pending/lapsed subscription) go to
@@ -101,6 +102,7 @@ export default async function AppLayout({
         <TimeZoneSync />
         <CommandPalette />
         <LiveUpdates />
+        <CloudCelebration />
         <ChatDock
           tier={chatOptions.tier}
           provider={chatOptions.provider}

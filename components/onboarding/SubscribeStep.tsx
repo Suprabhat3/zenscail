@@ -86,7 +86,11 @@ export function SubscribeStep({
             signature: res.razorpay_signature,
           });
           if (result.ok) {
-            router.replace("/dashboard");
+            // Don't navigate here — that would unmount the upgrade celebration
+            // before it can play. The CloudCelebration listener (mounted in the
+            // onboarding layout) detects the now-active subscription via the
+            // server push (with a poll fallback), shows the confetti screen, and
+            // routes into /dashboard on dismiss.
           } else {
             setError("We couldn't verify the payment. Contact support if charged.");
           }

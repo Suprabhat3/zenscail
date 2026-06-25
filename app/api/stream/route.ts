@@ -36,7 +36,9 @@ export async function GET() {
       safeEnqueue(": connected\n\n");
       send("ready", { at: Date.now() });
 
-      const unsubscribe = subscribe(userId, (e: RealtimeEvent) => send("inbox", e));
+      const unsubscribe = subscribe(userId, (e: RealtimeEvent) =>
+        send(e.channel === "subscription" ? "subscription" : "inbox", e),
+      );
 
       // Heartbeat keeps proxies/load-balancers from closing the idle connection.
       const heartbeat = setInterval(() => safeEnqueue(": ping\n\n"), 25_000);

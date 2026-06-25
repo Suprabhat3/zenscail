@@ -53,6 +53,11 @@ model Subscription {
   // Set when the user cancels at cycle end: the subscription stays "active"
   // (and Cloud keeps working) until `currentEnd`, then stops renewing.
   cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
+  // Stamped when the one-time "welcome to Cloud" celebration has been shown for
+  // the current activation. Cleared on every (re)activation (admin grant, paid
+  // checkout, webhook activation) so a fresh subscription celebrates again, and
+  // it survives the OAuth reload that happens when the user connects Gmail.
+  cloudCelebratedAt      DateTime? @map("cloud_celebrated_at")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 

@@ -13,6 +13,7 @@ import {
   razorpayKeyId,
 } from "@/lib/razorpay";
 import { isActiveStatus } from "@/lib/subscription";
+import { publish } from "@/lib/realtime";
 import { CLOUD_PLAN } from "@/lib/plan";
 import { sendCloudReceiptEmail } from "@/lib/email/send";
 import { providerModelSchema } from "@/lib/validation";
@@ -163,7 +164,9 @@ export async function verifyCloudSubscription(args: {
       status,
       currentEnd,
     },
-    update: { status, currentEnd },
+    // Re-arm the celebration for this fresh activation (e.g. resubscribing
+    // after a lapse), so the upgrade screen plays again.
+    update: { status, currentEnd, cloudCelebratedAt: null },
   });
 
   await prisma.userAiSettings.upsert({
@@ -191,6 +194,15 @@ export async function verifyCloudSubscription(args: {
     } catch (err) {
       console.warn("Cloud receipt email skipped:", err);
     }
+
+    // Push to the user's open tab so the same upgrade celebration plays on a
+    // self-paid subscription, not just admin grants. In-process bus → reliable
+    // on the single-instance deploy; the client poll covers any miss.
+    publish(session.user.id, {
+      channel: "subscription",
+      type: "granted",
+      at: Date.now(),
+    });
   }
 
   return { ok: isActiveStatus(status) };

@@ -5,7 +5,7 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { syncConnectedEmail } from "@/lib/identity";
 import { razorpayConfigured } from "@/lib/razorpay";
-import { isActiveStatus } from "@/lib/subscription";
+import { hasCloudAccess } from "@/lib/subscription";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { ConnectStep } from "@/components/onboarding/ConnectStep";
 import { AiChoiceStep } from "@/components/onboarding/AiChoiceStep";
@@ -35,7 +35,7 @@ export default async function OnboardingPage({
       email: true,
       onboardedAt: true,
       aiSettings: { select: { tier: true } },
-      subscription: { select: { status: true } },
+      subscription: { select: { status: true, currentEnd: true } },
     },
   });
 
@@ -44,7 +44,7 @@ export default async function OnboardingPage({
   const reactivate =
     Boolean(user?.onboardedAt) &&
     user?.aiSettings?.tier === "cloud" &&
-    !isActiveStatus(user?.subscription?.status);
+    !hasCloudAccess(user?.subscription);
 
   // Already finished and has access — nothing to do here.
   if (user?.onboardedAt && !reactivate) redirect("/dashboard");
