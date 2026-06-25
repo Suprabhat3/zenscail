@@ -254,16 +254,23 @@ export function ChatDock({ tier, provider, defaultModel, models }: Props) {
     })();
   }, [open, loadConversation, setConversation]);
 
-  // A prompt queued from elsewhere in the UI (e.g. dashboard's "Ask about this
-  // brief"). Deferred a tick so we're not setting state synchronously here.
+  // A prompt queued from elsewhere in the UI (e.g. the quick-add bar or the
+  // dashboard's "Ask about this brief"). A hand-off always starts its OWN fresh
+  // conversation — never appended to whatever was last loaded in the dock —
+  // otherwise the agent would be handed the previous (already finished) thread
+  // alongside the new command and reply to that first. Deferred a tick so we're
+  // not setting state synchronously here.
   useEffect(() => {
     if (!open || !seed || busy) return;
     const id = setTimeout(() => {
+      setMessages([]);
+      setFeedback({});
+      setConversation(newId());
       send(seed);
       consumeSeed();
     }, 0);
     return () => clearTimeout(id);
-  }, [open, seed, busy, send, consumeSeed]);
+  }, [open, seed, busy, send, consumeSeed, setMessages, setConversation]);
 
   // Stick to the bottom as messages stream in.
   useEffect(() => {
