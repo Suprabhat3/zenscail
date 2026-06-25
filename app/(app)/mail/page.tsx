@@ -28,6 +28,7 @@ import { LocalDraftsList, type LocalDraft } from "@/components/mail/LocalDraftsL
 import { refreshInbox, trashMessageAction, archiveMessageAction } from "./actions";
 import { catchUpSchedules } from "./schedule-actions";
 import { processDueFollowUps, listSurfacedFollowUps } from "@/lib/followUp";
+import { getUserTimeZone, formatInTZ, ymdInTZ } from "@/lib/timezone";
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, low: 2 };
 
@@ -44,19 +45,18 @@ const BUNDLE_META: Record<Category, { emoji: string; title: string }> = {
 
 export const metadata = { title: "Mail — ZenScail" };
 
-function formatDate(value: string | number | null | undefined): string {
+function formatDate(value: string | number | null | undefined, tz: string): string {
   if (value == null) return "";
   const n = Number(value);
   const d = new Date(Number.isNaN(n) || n <= 0 ? String(value) : n);
   if (Number.isNaN(d.getTime())) return "";
-  const today = new Date();
-  return d.toDateString() === today.toDateString()
-    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return ymdInTZ(d.getTime(), tz) === ymdInTZ(Date.now(), tz)
+    ? formatInTZ(d, tz, { hour: "2-digit", minute: "2-digit" })
+    : formatInTZ(d, tz, { month: "short", day: "numeric" });
 }
 
-function formatWhen(d: Date): string {
-  return d.toLocaleString([], {
+function formatWhen(d: Date, tz: string): string {
+  return formatInTZ(d, tz, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -112,6 +112,8 @@ export default async function MailPage({
   // Bundled vs flat layout preference (cookie, toggled client-side).
   const layout: "bundled" | "flat" =
     (await cookies()).get("mail_layout")?.value === "flat" ? "flat" : "bundled";
+  // Viewer's timezone so server-rendered timestamps match their local clock.
+  const tz = await getUserTimeZone();
   // Bundling only applies to the default inbox view; folders/tabs stay flat.
   const isDefaultView =
     isInbox && !urgentFirst && !unreadView && !snoozedView && !scheduledView;
@@ -210,7 +212,7 @@ export default async function MailPage({
         subject: d.subject,
         preview: text.slice(0, 120),
         isHtml: d.isHtml,
-        updatedAt: formatWhen(d.updatedAt),
+        updatedAt: formatWhen(d.updatedAt, tz),
       };
     });
   }
@@ -388,9 +390,9 @@ export default async function MailPage({
 
       {/* Body */}
       {snoozedView ? (
-        <SnoozedList snoozed={snoozed} formatWhen={formatWhen} />
+        <SnoozedList snoozed={snoozed} formatWhen={(d) => formatWhen(d, tz)} />
       ) : scheduledView ? (
-        <ScheduledList scheduled={scheduled} formatWhen={formatWhen} />
+        <ScheduledList scheduled={scheduled} formatWhen={(d) => formatWhen(d, tz)} />
       ) : messages.length === 0 ? (
         folderKey === "drafts" && localDrafts.length > 0 ? null : (
         <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) px-4 py-20 text-center shadow-(--shadow-card)">
@@ -426,7 +428,7 @@ export default async function MailPage({
                   defaultOpen={b.category === "important" || b.category === "other"}
                 >
                   {b.messages.map((m) => (
-                    <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} />
+                    <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} tz={tz} />
                   ))}
                 </BundleSection>
               );
@@ -439,7 +441,7 @@ export default async function MailPage({
           <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
             <ul className="divide-y divide-(--line-soft)">
               {messages.map((m) => (
-                <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} />
+                <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} tz={tz} />
               ))}
             </ul>
           </div>
@@ -462,7 +464,7 @@ function InboxTip() {
   );
 }
 
-function MessageRow({ m, p }: { m: InboxMessage; p?: RowMeta }) {
+function MessageRow({ m, p, tz }: { m: InboxMessage; p?: RowMeta; tz: string }) {
   const sender = parseSender(m.from || "");
   return (
     <li
@@ -494,7 +496,7 @@ function MessageRow({ m, p }: { m: InboxMessage; p?: RowMeta }) {
               <PriorityBadge priority={p.priority} reason={p.reason} />
             )}
           </span>
-          <span className="shrink-0 text-xs text-(--muted)">{formatDate(m.internalDate)}</span>
+          <span className="shrink-0 text-xs text-(--muted)">{formatDate(m.internalDate, tz)}</span>
         </div>
         <p
           className={`mt-0.5 truncate text-sm ${

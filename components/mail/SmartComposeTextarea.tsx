@@ -66,7 +66,7 @@ export function SmartComposeTextarea({
   const fetchCompletion = useCallback(
     (text: string, attempt = 0) => {
       const now = Date.now();
-      const minGapMs = 1200;
+      const minGapMs = 700;
       if (attempt === 0 && now - lastFetchAtRef.current < minGapMs) {
         const wait = minGapMs - (now - lastFetchAtRef.current);
         if (timerRef.current) clearTimeout(timerRef.current);
@@ -127,7 +127,7 @@ export function SmartComposeTextarea({
     if (timerRef.current) clearTimeout(timerRef.current);
     const atEnd = e.target.selectionStart === next.length;
     if (!atEnd || next.trim().length < 2) return;
-    timerRef.current = setTimeout(() => fetchCompletion(next), 750);
+    timerRef.current = setTimeout(() => fetchCompletion(next), 350);
   }
 
   function accept() {

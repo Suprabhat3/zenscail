@@ -10,24 +10,23 @@ import {
   AskBriefButton,
   RefreshBriefButton,
 } from "@/components/dashboard/BriefChatButtons";
+import { getUserTimeZone, formatInTZ, partsInTZ } from "@/lib/timezone";
 
 export const metadata = { title: "Today — ZenScail" };
 export const dynamic = "force-dynamic";
 
-function greeting(): string {
-  const h = new Date().getHours();
+function greeting(tz: string): string {
+  const h = partsInTZ(Date.now(), tz).hour;
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
 }
 
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+function fmtTime(iso: string, tz: string): string {
+  return formatInTZ(iso, tz, { hour: "numeric", minute: "2-digit" });
 }
 
-function TodayTimeline({ events }: { events: BriefEvent[] }) {
+function TodayTimeline({ events, tz }: { events: BriefEvent[]; tz: string }) {
   if (events.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-(--line) px-4 py-8 text-center">
@@ -44,13 +43,13 @@ function TodayTimeline({ events }: { events: BriefEvent[] }) {
             className="flex min-w-0 flex-1 gap-3"
           >
             <span className="w-16 shrink-0 pt-0.5 text-xs font-bold text-(--accent)">
-              {e.allDay ? "All day" : fmtTime(e.start)}
+              {e.allDay ? "All day" : fmtTime(e.start, tz)}
             </span>
             <span className="w-1 shrink-0 self-stretch rounded-full bg-(--sage)" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-(--ink)">{e.summary}</span>
               <span className="block text-xs text-(--muted)">
-                {!e.allDay && `until ${fmtTime(e.end)}`}
+                {!e.allDay && `until ${fmtTime(e.end, tz)}`}
                 {e.location ? ` · ${e.location}` : ""}
                 {e.attendeeCount > 1 ? ` · ${e.attendeeCount} people` : ""}
               </span>
@@ -85,9 +84,10 @@ export default async function DashboardPage() {
     name: session.user.name,
   });
 
+  const tz = await getUserTimeZone();
   const brief = await getTodayBrief(session.user.id);
   const firstName = session.user.name?.split(" ")[0] || "there";
-  const today = new Date().toLocaleDateString("en-US", {
+  const today = formatInTZ(new Date().getTime(), tz, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
             {today}
           </p>
           <h1 className="mt-1 font-serif text-3xl text-(--ink) sm:text-4xl">
-            {greeting()}, {firstName}
+            {greeting(tz)}, {firstName}
           </h1>
           {brief && <p className="mt-2 max-w-2xl text-base text-(--ink-soft)">{brief.headline}</p>}
         </div>
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
                 value: brief.stats.meetingsToday,
                 label: "meetings today",
                 sub: brief.events[0]
-                  ? `first at ${brief.events[0].allDay ? "—" : fmtTime(brief.events[0].start)}`
+                  ? `first at ${brief.events[0].allDay ? "—" : fmtTime(brief.events[0].start, tz)}`
                   : "calendar is clear",
                 href: "/calendar",
               },
@@ -206,7 +206,7 @@ export default async function DashboardPage() {
                   </Link>
                 </div>
                 <div className="mt-4">
-                  <TodayTimeline events={brief.events} />
+                  <TodayTimeline events={brief.events} tz={tz} />
                 </div>
               </section>
 
@@ -233,9 +233,9 @@ export default async function DashboardPage() {
                 </div>
                 <p className="mt-4 text-xs leading-relaxed text-(--muted)">
                   Brief generated{" "}
-                  {brief.createdAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                  {formatInTZ(brief.createdAt, tz, { hour: "numeric", minute: "2-digit" })}
                   .{" "}
-                  {new Date().getHours() >= 17
+                  {partsInTZ(new Date().getTime(), tz).hour >= 17
                     ? "Tomorrow’s brief lands at 9:00 — rest easy."
                     : "A fresh one arrives every morning at 9:00."}
                 </p>

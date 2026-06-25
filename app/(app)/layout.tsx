@@ -19,6 +19,7 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import { QuickAddBar } from "@/components/command/QuickAddBar";
 import { ToastProvider } from "@/components/ui/Toast";
 import { SnoozeHotkeyBridge } from "@/components/mail/SnoozeHotkeyBridge";
+import { TimeZoneSync } from "@/components/app/TimeZoneSync";
 
 export default async function AppLayout({
   children,
@@ -97,6 +98,7 @@ export default async function AppLayout({
         <MobileTabBar />
         <KeyboardShortcuts />
         <SnoozeHotkeyBridge />
+        <TimeZoneSync />
         <CommandPalette />
         <LiveUpdates />
         <ChatDock

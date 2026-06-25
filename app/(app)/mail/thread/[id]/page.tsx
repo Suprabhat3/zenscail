@@ -26,16 +26,16 @@ import { FollowUpButton } from "@/components/mail/FollowUpButton";
 import { SummaryBanner } from "@/components/mail/SummaryBanner";
 import { getFollowUp } from "@/lib/followUp";
 import { getEmailSummaryFor } from "@/lib/ai/summary";
+import { getUserTimeZone, formatInTZ, partsInTZ } from "@/lib/timezone";
 
 export const metadata = { title: "Thread — ZenScail" };
 
 /** "Thu, 12 Jun 2026 08:13:22 +0530 (IST)" → "Jun 12, 8:13 AM" (raw on parse failure). */
-function formatHeaderDate(raw: string): string {
+function formatHeaderDate(raw: string, tz: string): string {
   const ms = Date.parse(raw);
   if (Number.isNaN(ms)) return raw;
-  const d = new Date(ms);
-  const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleString([], {
+  const sameYear = partsInTZ(ms, tz).year === partsInTZ(Date.now(), tz).year;
+  return formatInTZ(ms, tz, {
     month: "short",
     day: "numeric",
     ...(sameYear ? {} : { year: "numeric" }),
@@ -47,13 +47,15 @@ function formatHeaderDate(raw: string): string {
 function MessageCard({
   message,
   defaultOpen,
+  tz,
 }: {
   message: GmailMessage;
   defaultOpen: boolean;
+  tz: string;
 }) {
   const from = header(message.payload, "From");
   const sender = parseSender(from);
-  const date = formatHeaderDate(header(message.payload, "Date"));
+  const date = formatHeaderDate(header(message.payload, "Date"), tz);
   const bodies = extractBodies(message.payload);
   const attachments = message.id ? extractAttachments(message.payload) : [];
 
@@ -146,6 +148,7 @@ export default async function ThreadPage({
 }) {
   const { id } = await params;
   const session = await requireSession();
+  const tz = await getUserTimeZone();
   const identity = await getAppIdentityForUser(session.user.id, session.user);
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
@@ -264,7 +267,7 @@ export default async function ThreadPage({
       {/* Messages — older ones collapsed, latest expanded */}
       <div className="mt-6 space-y-3">
         {messages.map((m, i) => (
-          <MessageCard key={m.id ?? i} message={m} defaultOpen={i === messages.length - 1} />
+          <MessageCard key={m.id ?? i} message={m} defaultOpen={i === messages.length - 1} tz={tz} />
         ))}
       </div>
 

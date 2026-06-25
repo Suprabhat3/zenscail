@@ -4,16 +4,14 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { getAvailability } from "@/lib/gcal";
 import { EventForm } from "@/components/calendar/EventForm";
+import { getUserTimeZone, formatInTZ, zonedToMs } from "@/lib/timezone";
 import { createEventAction } from "../actions";
 
 export const metadata = { title: "New event — ZenScail" };
 
-function formatTime(value?: string): string {
+function formatTime(value: string | undefined, tz: string): string {
   if (!value) return "";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime())
-    ? ""
-    : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return formatInTZ(value, tz, { hour: "2-digit", minute: "2-digit" });
 }
 
 export default async function NewEventPage({
@@ -32,15 +30,16 @@ export default async function NewEventPage({
   const { date, summary, description, startTime, endTime, attendees, addMeet } =
     await searchParams;
   const session = await requireSession();
+  const tz = await getUserTimeZone();
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
 
   // Availability helper: when a day is pre-selected, show busy slots for it.
   let busy: { start?: string; end?: string }[] = [];
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    const dayStart = new Date(`${date}T00:00:00`);
-    const dayEnd = new Date(dayStart.getTime() + 86400_000);
-    busy = await getAvailability(t, dayStart, dayEnd);
+    const [y, m, d] = date.split("-").map(Number);
+    const dayStartMs = zonedToMs(y, m, d, 0, 0, tz);
+    busy = await getAvailability(t, new Date(dayStartMs), new Date(dayStartMs + 86400_000));
   }
 
   return (
@@ -67,7 +66,7 @@ export default async function NewEventPage({
               <span className="font-medium text-(--ink)">all clear</span>
             ) : (
               <span className="text-(--ink-soft)">
-                {busy.map((b) => `${formatTime(b.start)}–${formatTime(b.end)}`).join(", ")}
+                {busy.map((b) => `${formatTime(b.start, tz)}–${formatTime(b.end, tz)}`).join(", ")}
               </span>
             )}
           </span>
