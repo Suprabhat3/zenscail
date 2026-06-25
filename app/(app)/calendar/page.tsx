@@ -13,6 +13,8 @@ import {
 } from "@/lib/gcal";
 import { NowLine } from "@/components/calendar/NowLine";
 import { CalendarSidebar } from "@/components/calendar/CalendarSidebar";
+import { SubmitButton } from "@/components/app/SubmitButton";
+import { PendingLink } from "@/components/app/PendingLink";
 import { refreshCalendar, createInstantMeet } from "./actions";
 
 export const metadata = { title: "Calendar — ZenScail" };
@@ -215,7 +217,7 @@ export default async function CalendarPage({
             {/* View switcher */}
             <div className="flex items-center overflow-hidden rounded-full border border-(--line) bg-(--paper) text-sm">
               {(["day", "week", "month"] as View[]).map((v) => (
-                <Link
+                <PendingLink
                   key={v}
                   href={`/calendar?view=${v}&date=${ymd(anchor)}`}
                   className={`px-3.5 py-2 font-semibold capitalize transition hover:bg-(--bg-deep) ${
@@ -223,31 +225,34 @@ export default async function CalendarPage({
                   }`}
                 >
                   {v}
-                </Link>
+                </PendingLink>
               ))}
             </div>
             {/* Prev / Today / Next */}
             <div className="flex items-center overflow-hidden rounded-full border border-(--line) bg-(--paper)">
-              <Link href={shift(-1)} aria-label="Previous" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
+              <PendingLink href={shift(-1)} ariaLabel="Previous" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
                 ←
-              </Link>
-              <Link href={`/calendar?view=${view}`} className="border-x border-(--line-soft) px-3.5 py-2 text-sm font-semibold text-(--ink-soft) transition hover:bg-(--bg-deep)">
+              </PendingLink>
+              <PendingLink href={`/calendar?view=${view}`} className="border-x border-(--line-soft) px-3.5 py-2 text-sm font-semibold text-(--ink-soft) transition hover:bg-(--bg-deep)">
                 Today
-              </Link>
-              <Link href={shift(1)} aria-label="Next" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
+              </PendingLink>
+              <PendingLink href={shift(1)} ariaLabel="Next" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
                 →
-              </Link>
+              </PendingLink>
             </div>
             <form action={refreshCalendar}>
-              <button
+              <SubmitButton
                 title="Sync with Google Calendar"
+                pendingLabel="Syncing…"
                 className="flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
+                  </svg>
+                }
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
-                </svg>
                 Refresh
-              </button>
+              </SubmitButton>
             </form>
             <Link
               href="/calendar/links"
@@ -260,16 +265,19 @@ export default async function CalendarPage({
               Booking links
             </Link>
             <form action={createInstantMeet}>
-              <button
+              <SubmitButton
                 title="Start an instant Google Meet now"
+                pendingLabel="Starting…"
                 className="flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="m23 7-7 5 7 5V7z" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" />
+                  </svg>
+                }
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="m23 7-7 5 7 5V7z" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" />
-                </svg>
                 Meet now
-              </button>
+              </SubmitButton>
             </form>
             <Link
               href="/calendar/new"
@@ -513,7 +521,7 @@ function MonthView({
                 i % 7 === 0 ? "border-l-0" : ""
               } ${inMonth ? "" : "bg-(--bg)/40"}`}
             >
-              <Link
+              <PendingLink
                 href={`/calendar?view=day&date=${ymd(date)}`}
                 className="flex items-center justify-end"
               >
@@ -524,7 +532,7 @@ function MonthView({
                 >
                   {date.getDate()}
                 </span>
-              </Link>
+              </PendingLink>
               <div className="mt-1 space-y-0.5">
                 {dayEvents.slice(0, 3).map((e, idx) => (
                   <Link
@@ -539,12 +547,12 @@ function MonthView({
                   </Link>
                 ))}
                 {dayEvents.length > 3 && (
-                  <Link
+                  <PendingLink
                     href={`/calendar?view=day&date=${ymd(date)}`}
                     className="block px-1.5 text-[10px] font-semibold text-(--muted) hover:text-(--ink)"
                   >
                     +{dayEvents.length - 3} more
-                  </Link>
+                  </PendingLink>
                 )}
               </div>
             </div>

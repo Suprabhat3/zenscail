@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TimeZoneField } from "./TimeZoneField";
 import { RecipientField } from "@/components/mail/RecipientField";
+import { SubmitButton } from "@/components/app/SubmitButton";
 import type { EventReminder, GcalEvent } from "@/lib/gcal";
 
 const inputClass =
@@ -404,9 +405,12 @@ export function EventForm({
       </label>
 
       <div className="flex items-center gap-2 pt-1">
-        <button className="rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)">
+        <SubmitButton
+          pendingLabel="Saving…"
+          className="flex items-center gap-1.5 rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)"
+        >
           {submitLabel}
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );

@@ -43,9 +43,18 @@ export function SmartComposeTextarea({
   const overlayRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchAtRef = useRef(0);
+  const seqRef = useRef(0);
 
   useEffect(() => {
     setEnabled(window.localStorage.getItem(SMART_COMPOSE_KEY) === "on");
+    function onStorage(e: StorageEvent) {
+      if (e.key === SMART_COMPOSE_KEY) {
+        setEnabled(e.newValue === "on");
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const clearGhost = useCallback(() => {
@@ -55,10 +64,21 @@ export function SmartComposeTextarea({
   }, []);
 
   const fetchCompletion = useCallback(
-    (text: string) => {
+    (text: string, attempt = 0) => {
+      const now = Date.now();
+      const minGapMs = 1200;
+      if (attempt === 0 && now - lastFetchAtRef.current < minGapMs) {
+        const wait = minGapMs - (now - lastFetchAtRef.current);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => fetchCompletion(text, 0), wait);
+        return;
+      }
+
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      const seq = ++seqRef.current;
+      lastFetchAtRef.current = Date.now();
 
       const subject = subjectId
         ? (document.getElementById(subjectId) as HTMLInputElement | null)?.value
@@ -73,10 +93,23 @@ export function SmartComposeTextarea({
         body: JSON.stringify({ body: text, subject, to }),
         signal: controller.signal,
       })
-        .then((r) => (r.ok ? r.json() : { completion: "" }))
-        .then((d: { completion?: string }) => {
-          // Ignore if the textarea changed since the request started.
-          if (controller.signal.aborted) return;
+        .then(async (r) => {
+          if (r.status === 429 && attempt < 2) {
+            const retryAfter = Number(r.headers.get("Retry-After") || "2");
+            const delay = Math.min(8000, Math.max(1000, retryAfter * 1000));
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            if (seq !== seqRef.current || controller.signal.aborted) return null;
+            return fetchCompletion(text, attempt + 1);
+          }
+          if (!r.ok) return { completion: "" };
+          try {
+            return (await r.json()) as { completion?: string };
+          } catch {
+            return { completion: "" };
+          }
+        })
+        .then((d) => {
+          if (!d || controller.signal.aborted || seq !== seqRef.current) return;
           if (taRef.current && taRef.current.value === text) {
             setGhost(typeof d.completion === "string" ? d.completion : "");
           }
@@ -94,7 +127,7 @@ export function SmartComposeTextarea({
     if (timerRef.current) clearTimeout(timerRef.current);
     const atEnd = e.target.selectionStart === next.length;
     if (!atEnd || next.trim().length < 2) return;
-    timerRef.current = setTimeout(() => fetchCompletion(next), 550);
+    timerRef.current = setTimeout(() => fetchCompletion(next), 750);
   }
 
   function accept() {
