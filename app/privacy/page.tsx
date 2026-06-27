@@ -74,6 +74,16 @@ export default function PrivacyPage() {
           summarise, and your calendar events and availability. We access this data on
           your behalf and only when you use a feature that needs it.
         </p>
+        <p>
+          To connect to Google and other services, ZenScail uses{" "}
+          <strong>Corsair</strong> (corsair.dev), an integration and agentic-tooling
+          platform. Corsair manages the authorised connection to your accounts and lets
+          our AI assistant carry out the actions you request — such as reading and
+          summarising messages, checking your availability, and preparing drafts or events
+          for your review. Your mailbox and calendar data passes through Corsair only to
+          perform these operations on your behalf and is handled under Corsair&rsquo;s own
+          terms and privacy policy.
+        </p>
         <h3>Billing &amp; subscription information</h3>
         <p>
           If you subscribe to ZenScail Cloud, our payment processor (Razorpay) collects and
@@ -162,6 +172,7 @@ export default function PrivacyPage() {
         <ul>
           <li><strong>Service providers (sub-processors)</strong> who run our infrastructure — hosting, our database, transactional email delivery, and the AI provider you choose. Each is bound by contract to protect your data.</li>
           <li><strong>Razorpay</strong>, our payment processor, to securely take payment and manage your ZenScail Cloud subscription.</li>
+          <li><strong>Corsair</strong> (corsair.dev), our integration and agentic-tooling provider, which manages the authorised connection between ZenScail and the services you link (such as Google) and carries out the email and calendar actions you request.</li>
           <li><strong>Google</strong>, to read and act on your mailbox and calendar at your direction.</li>
           <li><strong>Legal & safety</strong> reasons, when required by law or to protect the rights and safety of users.</li>
           <li><strong>Business transfers</strong>, if ZenScail is involved in a merger or acquisition — you&rsquo;ll be notified before your data becomes subject to a different policy.</li>

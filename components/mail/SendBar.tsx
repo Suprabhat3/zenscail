@@ -11,6 +11,8 @@ import {
 import { deleteDraft } from "@/app/(app)/mail/draft-actions";
 import { useToast } from "@/components/ui/Toast";
 import { sendLaterPresets, fmtDateTime, localInputToIso } from "@/lib/timePresets";
+import { useAttachments } from "@/components/mail/AttachmentsContext";
+import type { OutgoingAttachmentInput } from "@/lib/attachments";
 
 export const UNDO_SECS_KEY = "zenscail_undo_secs";
 
@@ -29,6 +31,7 @@ type Payload = {
   isHtml?: boolean;
   threadId?: string;
   inReplyTo?: string;
+  attachments?: OutgoingAttachmentInput[];
 };
 
 /**
@@ -47,6 +50,7 @@ export function SendBar({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const attachments = useAttachments();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -101,17 +105,30 @@ export function SendBar({
     if (id) await deleteDraft(id).catch(() => {});
   }
 
+  /** Fold any staged attachments (base64-encoded) into the send payload. */
+  async function withAttachments(payload: Payload): Promise<Payload> {
+    if (!attachments || attachments.files.length === 0) return payload;
+    return { ...payload, attachments: await attachments.toPayload() };
+  }
+
   async function onSend() {
-    const payload = readForm();
-    if (!payload) return;
+    const base = readForm();
+    if (!base) return;
     setBusy(true);
+    const payload = await withAttachments(base);
     const secs = readUndoSecs();
     try {
       if (secs === 0) {
         // Undo disabled — send immediately.
         const { id } = await deferSend(payload, 0);
-        await flushScheduledSend(id);
+        const outcome = await flushScheduledSend(id);
+        if (outcome !== "sent") {
+          toast("Couldn’t send your message — please try again. Your draft is kept.");
+          setBusy(false);
+          return;
+        }
         await dropDraft();
+        attachments?.clear();
         toast("Sent");
         router.push(successHref);
         router.refresh();
@@ -133,8 +150,16 @@ export function SendBar({
         },
         onExpire: async () => {
           if (undone) return;
-          await flushScheduledSend(id).catch(() => {});
+          const outcome = await flushScheduledSend(id).catch(
+            () => "failed" as const,
+          );
+          if (outcome !== "sent") {
+            toast("Couldn’t send your message — it’s still in your drafts.");
+            setBusy(false);
+            return;
+          }
           await dropDraft();
+          attachments?.clear();
           router.push(successHref);
           router.refresh();
         },
@@ -146,13 +171,15 @@ export function SendBar({
   }
 
   async function onScheduleLater(date: Date) {
-    const payload = readForm();
-    if (!payload) return;
+    const base = readForm();
+    if (!base) return;
     setMenuOpen(false);
     setBusy(true);
     try {
+      const payload = await withAttachments(base);
       await scheduleSend(payload, date.toISOString());
       await dropDraft();
+      attachments?.clear();
       toast(`Scheduled for ${fmtDateTime(date)}`);
       router.push("/mail?view=scheduled");
       router.refresh();

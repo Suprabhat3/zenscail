@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { isActiveStatus } from "@/lib/subscription";
+import { hasCloudAccess } from "@/lib/subscription";
 import { getChatModelOptions } from "@/lib/ai/registry";
 import { getAppIdentityForUser } from "@/lib/identity";
 import { AppNav } from "@/components/app/AppNav";
@@ -11,6 +11,7 @@ import { UserMenu } from "@/components/app/UserMenu";
 import { PlanBadge } from "@/components/app/PlanBadge";
 import { KeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcuts";
 import { LiveUpdates } from "@/components/realtime/LiveUpdates";
+import { CloudCelebration } from "@/components/realtime/CloudCelebration";
 import { ChatProvider } from "@/components/chat/ChatProvider";
 import { ChatDock } from "@/components/chat/ChatDock";
 import { ChatLauncher } from "@/components/chat/ChatLauncher";
@@ -19,52 +20,70 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import { QuickAddBar } from "@/components/command/QuickAddBar";
 import { ToastProvider } from "@/components/ui/Toast";
 import { SnoozeHotkeyBridge } from "@/components/mail/SnoozeHotkeyBridge";
+import { TimeZoneSync } from "@/components/app/TimeZoneSync";
+import { DemoProvider } from "@/components/demo/DemoProvider";
+import {
+  isDemoMode,
+  DEMO_IDENTITY,
+  DEMO_CHAT_OPTIONS,
+} from "@/lib/demo";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireSession();
+  // Tour mode: render the real app chrome around hardcoded dummy data, with no
+  // session and no gate. Mutating actions still require auth (see lib/demo.ts),
+  // so this is a read-only preview the DemoProvider guards client-side.
+  const demo = await isDemoMode();
 
-  // First-run gate. Access is granted on capability, not on a stale flag: a user
-  // may use the app only once they have a *working* AI path — a stored BYOK key
-  // or an active Cloud subscription. Connecting a mailbox alone is not enough
-  // (that's only the first onboarding step), so a user who cancels checkout and
-  // adds no key is routed back to finish setup instead of slipping through.
-  const gateUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      connectedEmail: true,
-      aiSettings: { select: { tier: true, encryptedApiKey: true } },
-      subscription: { select: { status: true } },
-    },
-  });
+  let chatOptions = DEMO_CHAT_OPTIONS as Awaited<ReturnType<typeof getChatModelOptions>>;
+  let identity: Awaited<ReturnType<typeof getAppIdentityForUser>> = DEMO_IDENTITY;
+  let plan: "cloud" | "byok" = "cloud";
 
-  // Step 1 — a mailbox must be connected before anything else.
-  if (!gateUser?.connectedEmail) redirect("/onboarding");
+  if (!demo) {
+    const session = await requireSession();
 
-  const tier = gateUser.aiSettings?.tier;
-  const hasByokKey = tier === "byok" && Boolean(gateUser.aiSettings?.encryptedApiKey);
-  const hasActiveCloud = isActiveStatus(gateUser.subscription?.status);
+    // First-run gate. Access is granted on capability, not on a stale flag: a user
+    // may use the app only once they have a *working* AI path — a stored BYOK key
+    // or an active Cloud subscription. Connecting a mailbox alone is not enough
+    // (that's only the first onboarding step), so a user who cancels checkout and
+    // adds no key is routed back to finish setup instead of slipping through.
+    const gateUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        connectedEmail: true,
+        aiSettings: { select: { tier: true, encryptedApiKey: true } },
+        subscription: { select: { status: true, currentEnd: true } },
+      },
+    });
 
-  // No working AI path yet — send them to the right step to fix it. Users
-  // leaning Cloud (chose Cloud, or have a pending/lapsed subscription) go to
-  // checkout; everyone else picks an AI option.
-  if (!hasByokKey && !hasActiveCloud) {
-    const leansCloud = tier === "cloud" || Boolean(gateUser.subscription);
-    redirect(leansCloud ? "/onboarding?step=subscribe" : "/onboarding?step=ai");
+    // Step 1 — a mailbox must be connected before anything else.
+    if (!gateUser?.connectedEmail) redirect("/onboarding");
+
+    const tier = gateUser.aiSettings?.tier;
+    const hasByokKey = tier === "byok" && Boolean(gateUser.aiSettings?.encryptedApiKey);
+    const hasActiveCloud = hasCloudAccess(gateUser.subscription);
+
+    // No working AI path yet — send them to the right step to fix it. Users
+    // leaning Cloud (chose Cloud, or have a pending/lapsed subscription) go to
+    // checkout; everyone else picks an AI option.
+    if (!hasByokKey && !hasActiveCloud) {
+      const leansCloud = tier === "cloud" || Boolean(gateUser.subscription);
+      redirect(leansCloud ? "/onboarding?step=subscribe" : "/onboarding?step=ai");
+    }
+
+    chatOptions = await getChatModelOptions(session.user.id);
+    identity = await getAppIdentityForUser(session.user.id, session.user);
+
+    // Always-visible plan indicator. Cloud only when the subscription is active;
+    // otherwise the user is running on their own key.
+    plan = hasActiveCloud ? "cloud" : "byok";
   }
 
-  const chatOptions = await getChatModelOptions(session.user.id);
-
-  const identity = await getAppIdentityForUser(session.user.id, session.user);
-
-  // Always-visible plan indicator. Cloud only when the subscription is active;
-  // otherwise the user is running on their own key.
-  const plan: "cloud" | "byok" = hasActiveCloud ? "cloud" : "byok";
-
   return (
+    <DemoProvider active={demo}>
     <ChatProvider>
       <CommandProvider>
       <ToastProvider>
@@ -96,9 +115,16 @@ export default async function AppLayout({
         <main className="zs-app-main flex-1">{children}</main>
         <MobileTabBar />
         <KeyboardShortcuts />
-        <SnoozeHotkeyBridge />
+        {/* Realtime + sync hit auth-gated endpoints — skipped in the demo tour. */}
+        {!demo && (
+          <>
+            <SnoozeHotkeyBridge />
+            <TimeZoneSync />
+            <LiveUpdates />
+            <CloudCelebration />
+          </>
+        )}
         <CommandPalette />
-        <LiveUpdates />
         <ChatDock
           tier={chatOptions.tier}
           provider={chatOptions.provider}
@@ -109,5 +135,6 @@ export default async function AppLayout({
       </ToastProvider>
       </CommandProvider>
     </ChatProvider>
+    </DemoProvider>
   );
 }

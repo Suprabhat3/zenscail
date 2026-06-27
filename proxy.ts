@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 import { rateLimit, type RateResult } from "@/lib/rate-limit";
+import { DEMO_COOKIE } from "@/lib/demo-shared";
 
 // Expensive LLM / transcription routes get a tighter per-IP ceiling than the
 // rest of the API. Matched by exact path or as a prefix (e.g. /api/compose/...).
@@ -14,6 +15,7 @@ const AI_PATHS = [
 // Per-IP tiers (window: 60s). Generous enough for 100–200 concurrent users; the
 // goal is only to stop a single client from hammering us. All tunable here.
 const PER_IP_AI = 30;
+const PER_IP_COMPOSE = 90; // smart-compose fires often while typing
 const PER_IP_STREAM = 30; // /api/stream connection attempts
 const PER_IP_DEFAULT = 120;
 const PER_IP_WINDOW_MS = 60_000;
@@ -57,13 +59,18 @@ function rateLimitApi(request: NextRequest): NextResponse | null {
   const ip = clientIp(request);
   const now = Date.now();
 
-  const isAi = AI_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isComposeComplete = pathname === "/api/compose-complete";
+  const isAi =
+    !isComposeComplete &&
+    AI_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const isStream = pathname === "/api/stream";
 
   // Per-IP tier first: a blocked client shouldn't consume a global slot.
-  const perIp = isAi
-    ? rateLimit(`ip:ai:${ip}`, PER_IP_AI, PER_IP_WINDOW_MS, now)
-    : isStream
+  const perIp = isComposeComplete
+    ? rateLimit(`ip:compose:${ip}`, PER_IP_COMPOSE, PER_IP_WINDOW_MS, now)
+    : isAi
+      ? rateLimit(`ip:ai:${ip}`, PER_IP_AI, PER_IP_WINDOW_MS, now)
+      : isStream
       ? rateLimit(`ip:stream:${ip}`, PER_IP_STREAM, PER_IP_WINDOW_MS, now)
       : rateLimit(`ip:default:${ip}`, PER_IP_DEFAULT, PER_IP_WINDOW_MS, now);
   if (!perIp.ok) return tooManyRequests(perIp);
@@ -85,6 +92,12 @@ export function proxy(request: NextRequest) {
   // validation happens in requireSession() inside the (app) layout/pages.
   const sessionCookie = getSessionCookie(request);
   if (!sessionCookie) {
+    // Demo tour: a visitor flagged with the demo cookie may browse the app's
+    // pages with no session. This only opens the read-only render path — every
+    // mutating action still calls requireSession() and is blocked client-side.
+    if (request.cookies.get(DEMO_COOKIE)?.value === "1") {
+      return NextResponse.next();
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);

@@ -5,11 +5,12 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { syncConnectedEmail } from "@/lib/identity";
 import { razorpayConfigured } from "@/lib/razorpay";
-import { isActiveStatus } from "@/lib/subscription";
+import { hasCloudAccess } from "@/lib/subscription";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { ConnectStep } from "@/components/onboarding/ConnectStep";
 import { AiChoiceStep } from "@/components/onboarding/AiChoiceStep";
 import { SubscribeStep } from "@/components/onboarding/SubscribeStep";
+import { CloudCelebration } from "@/components/realtime/CloudCelebration";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function OnboardingPage({
       email: true,
       onboardedAt: true,
       aiSettings: { select: { tier: true } },
-      subscription: { select: { status: true } },
+      subscription: { select: { status: true, currentEnd: true } },
     },
   });
 
@@ -44,7 +45,7 @@ export default async function OnboardingPage({
   const reactivate =
     Boolean(user?.onboardedAt) &&
     user?.aiSettings?.tier === "cloud" &&
-    !isActiveStatus(user?.subscription?.status);
+    !hasCloudAccess(user?.subscription);
 
   // Already finished and has access — nothing to do here.
   if (user?.onboardedAt && !reactivate) redirect("/dashboard");
@@ -90,10 +91,19 @@ export default async function OnboardingPage({
 
   const firstName = user?.name?.split(" ")[0];
 
+  // Reaching the AI/subscribe step means the connect step is done (Gmail +
+  // Calendar). If the user already has Cloud here — e.g. it was granted while
+  // they were on the connect step — show the "you're already upgraded"
+  // celebration instead of asking them to choose a plan or pay.
+  const onChoiceStep = current === "ai" || current === "subscribe";
+  const alreadyOnCloud = hasCloudAccess(user?.subscription);
+  const celebrateNow = onChoiceStep && alreadyOnCloud;
+  const subscriptionEndIso = user?.subscription?.currentEnd?.toISOString() ?? null;
+
   return (
     <OnboardingShell
       current={current}
-      showSubscribe={current === "subscribe"}
+      showSubscribe={current === "subscribe" && !alreadyOnCloud}
       greeting={firstName ? `Welcome, ${firstName}` : "Welcome"}
     >
       {current === "connect" && (
@@ -104,14 +114,20 @@ export default async function OnboardingPage({
           connectedEmail={connectedEmail}
         />
       )}
-      {current === "ai" && <AiChoiceStep keyError={error === "key"} />}
-      {current === "subscribe" && (
+      {current === "ai" && !alreadyOnCloud && <AiChoiceStep keyError={error === "key"} />}
+      {current === "subscribe" && !alreadyOnCloud && (
         <SubscribeStep
           configured={razorpayConfigured()}
           reactivate={reactivate}
           userName={user?.name ?? undefined}
           userEmail={user?.email ?? undefined}
         />
+      )}
+      {/* Mounted only past the connect step. Fires immediately if already on
+          Cloud, otherwise watches for a grant/payment that lands while the user
+          is on this page. */}
+      {onChoiceStep && (
+        <CloudCelebration immediate={celebrateNow} endsOnIso={subscriptionEndIso} />
       )}
     </OnboardingShell>
   );

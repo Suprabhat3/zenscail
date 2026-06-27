@@ -10,6 +10,7 @@ import { decryptSecret } from "@/lib/crypto";
 import {
   CLOUD_MODEL,
   CLOUD_CHEAP_MODEL,
+  COMPOSE_MODEL,
   MODELS,
   cheapModelFor,
   isValidModel,
@@ -120,4 +121,35 @@ export async function getChatModelOptions(userId: string): Promise<ChatModelOpti
     defaultModel: CLOUD_MODEL,
     models: MODELS.openai.map(({ id, label }) => ({ id, label })),
   };
+}
+
+/**
+ * Model for smart-compose ghost text. Uses a fast, non-reasoning OpenAI mini
+ * tier on cloud/BYOK-OpenAI; other BYOK providers fall back to their cheap model.
+ */
+export async function getComposeModelForUser(
+  userId: string,
+): Promise<{ model: LanguageModel; provider: AiProvider } | null> {
+  try {
+    const settings = await prisma.userAiSettings.findUnique({ where: { userId } });
+
+    if (
+      settings?.tier === "byok" &&
+      settings.provider &&
+      settings.encryptedApiKey
+    ) {
+      const provider = settings.provider as AiProvider;
+      const apiKey = decryptSecret(settings.encryptedApiKey);
+      const modelId =
+        provider === "openai" && isValidModel("openai", COMPOSE_MODEL)
+          ? COMPOSE_MODEL
+          : cheapModelFor(provider);
+      return { model: modelInstance(provider, modelId, apiKey), provider };
+    }
+
+    if (!process.env.OPENAI_API_KEY) return null;
+    return { model: openai(COMPOSE_MODEL), provider: "openai" };
+  } catch {
+    return null;
+  }
 }

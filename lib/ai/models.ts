@@ -85,6 +85,12 @@ export const CLOUD_MODEL = "gpt-5.4";
 export const CLOUD_CHEAP_MODEL = "gpt-5-nano";
 
 /**
+ * Smart-compose ghost text — a fast non-reasoning model so completions don't
+ * burn the whole output budget on hidden reasoning (common with nano tiers).
+ */
+export const COMPOSE_MODEL = "gpt-5.4-mini";
+
+/**
  * Speech-to-text model for the mic / voice-command feature. Always runs on our
  * OPENAI_API_KEY (transcription is OpenAI-specific, independent of the user's
  * chosen chat provider).

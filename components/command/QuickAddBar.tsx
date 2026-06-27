@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChatDock } from "@/components/chat/ChatProvider";
+import { useDemo } from "@/components/demo/DemoProvider";
 import { useToast } from "@/components/ui/Toast";
 import { MicButton } from "@/components/voice/MicButton";
 import { runQuickCommand } from "@/app/(app)/quick-add/actions";
@@ -30,6 +31,7 @@ const STEPS = [
 export function QuickAddBar() {
   const router = useRouter();
   const { openWith } = useChatDock();
+  const { active: demo, requireLogin } = useDemo();
   const { toast } = useToast();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,6 +54,10 @@ export function QuickAddBar() {
     e.preventDefault();
     const value = text.trim();
     if (!value || busy) return;
+    if (demo) {
+      requireLogin("Sign in and the assistant will carry this out — drafting emails and building events for you.");
+      return;
+    }
     setBusy(true);
     try {
       const result = await runQuickCommand(value);

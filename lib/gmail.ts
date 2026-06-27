@@ -98,6 +98,44 @@ export function extractBodies(payload: GmailPayload | undefined): {
   return { text, html };
 }
 
+/** A downloadable attachment found on a received message. */
+export type MessageAttachment = {
+  filename: string;
+  mimeType: string;
+  /** Gmail attachment id (used to identify the part; bytes live in Gmail). */
+  attachmentId: string;
+  /** Size in bytes (from the part body), 0 when unknown. */
+  size: number;
+};
+
+/**
+ * Walk MIME parts and collect real file attachments — parts that carry a
+ * `filename` and an `attachmentId` (the bytes are fetched separately). Inline
+ * images referenced by cid and the text/html body parts are skipped.
+ */
+export function extractAttachments(
+  payload: GmailPayload | undefined,
+): MessageAttachment[] {
+  const out: MessageAttachment[] = [];
+  const seen = new Set<string>();
+  function walk(part?: GmailPayload) {
+    if (!part) return;
+    const attachmentId = part.body?.attachmentId;
+    if (part.filename && attachmentId && !seen.has(attachmentId)) {
+      seen.add(attachmentId);
+      out.push({
+        filename: part.filename,
+        mimeType: part.mimeType || "application/octet-stream",
+        attachmentId,
+        size: part.body?.size ?? 0,
+      });
+    }
+    part.parts?.forEach(walk);
+  }
+  walk(payload);
+  return out;
+}
+
 /** Collapse an HTML body into a rough plain-text fallback for the text part. */
 function htmlToPlain(html: string): string {
   return html
@@ -115,42 +153,31 @@ function htmlToPlain(html: string): string {
     .trim();
 }
 
-/**
- * Build a base64url-encoded RFC 2822 message for gmail.api.messages.send.
- * Plain by default. When `html` is given we send a multipart/alternative with
- * both a plain-text fallback and the styled HTML part, so every mail client
- * shows something readable.
- */
-export function buildRawEmail(opts: {
-  to: string;
-  subject: string;
-  text: string;
-  /** Inline-styled HTML body. When present the message is sent as HTML. */
-  html?: string;
-  cc?: string;
-  inReplyTo?: string;
-  references?: string;
-}): string {
-  const headers = [
-    `To: ${opts.to}`,
-    ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
-    `Subject: ${opts.subject}`,
-    ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
-    ...(opts.references ? [`References: ${opts.references}`] : []),
-    `MIME-Version: 1.0`,
-  ];
+/** An outgoing file attachment for buildRawEmail. */
+export type OutgoingAttachment = {
+  filename: string;
+  /** MIME type; defaults to application/octet-stream when empty. */
+  mimeType: string;
+  /** Raw file bytes. */
+  content: Buffer;
+};
 
+/** Encode a header value containing non-ASCII as RFC 2047 (e.g. unicode filenames). */
+function encodeHeaderWord(value: string): string {
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+  return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
+/** Build the content-type + body lines for the message text (no attachments). */
+function buildBodySection(opts: { text: string; html?: string }): string[] {
   if (!opts.html) {
-    const lines = [...headers, `Content-Type: text/plain; charset="UTF-8"`, ``, opts.text];
-    return encodeBase64Url(lines.join("\r\n"));
+    return [`Content-Type: text/plain; charset="UTF-8"`, ``, opts.text];
   }
-
   // multipart/alternative: text fallback first, HTML second (clients pick the
-  // richest part they can render). Boundary is fixed but unambiguous.
-  const boundary = "zenscail_boundary_a1b2c3";
+  // richest part they can render).
+  const boundary = "zenscail_alt_a1b2c3";
   const text = opts.text?.trim() ? opts.text : htmlToPlain(opts.html);
-  const lines = [
-    ...headers,
+  return [
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     ``,
     `--${boundary}`,
@@ -165,6 +192,67 @@ export function buildRawEmail(opts: {
     ``,
     `--${boundary}--`,
   ];
+}
+
+/**
+ * Build a base64url-encoded RFC 2822 message for gmail.api.messages.send.
+ * Plain by default. When `html` is given we send a multipart/alternative with
+ * both a plain-text fallback and the styled HTML part. When `attachments` are
+ * present the whole thing is wrapped in a multipart/mixed with one base64 part
+ * per file, so every mail client shows a readable body plus downloadable files.
+ */
+export function buildRawEmail(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  /** Inline-styled HTML body. When present the message is sent as HTML. */
+  html?: string;
+  cc?: string;
+  inReplyTo?: string;
+  references?: string;
+  attachments?: OutgoingAttachment[];
+}): string {
+  const headers = [
+    `To: ${opts.to}`,
+    ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
+    `Subject: ${opts.subject}`,
+    ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
+    ...(opts.references ? [`References: ${opts.references}`] : []),
+    `MIME-Version: 1.0`,
+  ];
+
+  const body = buildBodySection(opts);
+  const attachments = opts.attachments ?? [];
+
+  if (attachments.length === 0) {
+    return encodeBase64Url([...headers, ...body].join("\r\n"));
+  }
+
+  // multipart/mixed: the message body as the first part, then each file as a
+  // base64 attachment part (76-char-wrapped per RFC 2045).
+  const boundary = "zenscail_mixed_a1b2c3";
+  const lines = [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    ...body,
+  ];
+  for (const att of attachments) {
+    const name = encodeHeaderWord(att.filename || "attachment");
+    const data = att.content.toString("base64").replace(/(.{76})/g, "$1\r\n");
+    lines.push(
+      ``,
+      `--${boundary}`,
+      `Content-Type: ${att.mimeType || "application/octet-stream"}; name="${name}"`,
+      `Content-Transfer-Encoding: base64`,
+      `Content-Disposition: attachment; filename="${name}"`,
+      ``,
+      data,
+    );
+  }
+  lines.push(``, `--${boundary}--`);
+  // The raw MIME is ASCII (attachment data is base64), safe to UTF-8 url-encode.
   return encodeBase64Url(lines.join("\r\n"));
 }
 
@@ -243,9 +331,11 @@ export async function listInboxMessages(
     includeSpamTrash?: boolean;
     /** App user id — enables the local content cache (skips per-message gets). */
     userId?: string;
+    /** Gmail cursor for the next page (from a prior call's `nextPageToken`). */
+    pageToken?: string;
   } = {},
-): Promise<{ ok: boolean; messages: InboxMessage[] }> {
-  const { query, limit = 25, labelIds, includeSpamTrash, userId } = opts;
+): Promise<{ ok: boolean; messages: InboxMessage[]; nextPageToken?: string }> {
+  const { query, limit = 25, labelIds, includeSpamTrash, userId, pageToken } = opts;
   // The db cache has no searchable content columns, so we list message refs via
   // the API: Gmail `q` for search, or a label filter for folder views.
   const input: Record<string, unknown> = { maxResults: limit };
@@ -255,10 +345,12 @@ export async function listInboxMessages(
   if (labelIds && labelIds.length > 0) input.labelIds = labelIds;
   else if (labelIds === undefined && !query) input.labelIds = ["INBOX"];
   if (includeSpamTrash) input.includeSpamTrash = true;
-  const res = await t.run<{ messages?: { id?: string; threadId?: string }[] }>(
-    "gmail.api.messages.list",
-    input,
-  );
+  // Gmail pages via an opaque cursor (no offset support); pass it straight back.
+  if (pageToken) input.pageToken = pageToken;
+  const res = await t.run<{
+    messages?: { id?: string; threadId?: string }[];
+    nextPageToken?: string;
+  }>("gmail.api.messages.list", input);
   if (!res.success) return { ok: false, messages: [] };
 
   const refs: MessageRef[] = (res.data?.messages ?? [])
@@ -268,7 +360,7 @@ export async function listInboxMessages(
   const messages = (await hydrate(t, refs, userId)).sort(
     (a, b) => b.internalDate - a.internalDate,
   );
-  return { ok: true, messages };
+  return { ok: true, messages, nextPageToken: res.data?.nextPageToken };
 }
 
 /** A user-created Gmail label (system labels are filtered out). */
@@ -411,6 +503,7 @@ export async function getThreadCached(
 export async function getMessage(t: TenantScope, id: string) {
   return t.run<GmailMessage>("gmail.api.messages.get", { id, format: "full" });
 }
+
 
 export async function sendEmail(
   t: TenantScope,

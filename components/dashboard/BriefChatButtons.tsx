@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useChatDock } from "@/components/chat/ChatProvider";
+import { useDemo } from "@/components/demo/DemoProvider";
 import { generateBriefAction } from "@/app/(app)/dashboard/actions";
 
 /** "Ask about this brief" — opens the chat dock seeded with a prompt. */
@@ -45,16 +46,21 @@ export function AskItemButton({ title, subject, from }: { title: string; subject
 /** Regenerate today's brief in place. */
 export function RefreshBriefButton() {
   const router = useRouter();
+  const { active: demo, requireLogin } = useDemo();
   const [pending, startTransition] = useTransition();
   return (
     <button
       disabled={pending}
-      onClick={() =>
+      onClick={() => {
+        if (demo) {
+          requireLogin("Sign in to regenerate your brief from your live mail and calendar.");
+          return;
+        }
         startTransition(async () => {
           await generateBriefAction();
           router.refresh();
-        })
-      }
+        });
+      }}
       title="Regenerate with the latest mail and events"
       className="inline-flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-2 text-xs font-semibold text-(--ink-soft) transition hover:border-(--ink) disabled:opacity-50"
     >

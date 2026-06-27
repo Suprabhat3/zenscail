@@ -44,15 +44,21 @@ export function GenerateBrief() {
     const needsConnect = /not connected/i.test(error);
     return (
       <div className="rounded-2xl border border-(--line-soft) bg-(--paper) px-8 py-10 text-center shadow-(--shadow-card)">
-        <p className="font-serif text-2xl text-(--ink)">Couldn&rsquo;t build your brief</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-(--muted)">{error}</p>
+        <p className="font-serif text-2xl text-(--ink)">
+          {needsConnect ? "Reconnect to continue" : "Couldn’t build your brief"}
+        </p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-(--muted)">
+          {needsConnect
+            ? "Your Gmail and Calendar connection has expired or was disconnected. Reconnect your account to keep your morning briefs coming."
+            : error}
+        </p>
         <div className="mt-6 flex justify-center gap-3">
           {needsConnect ? (
             <Link
               href="/connect"
               className="rounded-full bg-(--ink) px-5 py-2.5 text-sm font-semibold text-(--bg) transition hover:bg-(--accent)"
             >
-              Connect Google
+              Reconnect Google
             </Link>
           ) : (
             <button

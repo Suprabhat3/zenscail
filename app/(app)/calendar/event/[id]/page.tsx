@@ -5,6 +5,7 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import type { GcalEvent } from "@/lib/gcal";
 import { EventForm } from "@/components/calendar/EventForm";
+import { SubmitButton } from "@/components/app/SubmitButton";
 import { updateEventAction, deleteEventAction } from "../../actions";
 
 export const metadata = { title: "Edit event — ZenScail" };
@@ -78,12 +79,17 @@ export default async function EditEventPage({
 
       <form action={deleteEventAction} className="mt-5">
         <input type="hidden" name="id" value={event.id ?? id} />
-        <button className="flex items-center gap-1.5 rounded-full border border-(--accent)/40 px-4 py-2 text-sm font-medium text-(--accent) transition hover:bg-(--accent-soft)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
+        <SubmitButton
+          pendingLabel="Deleting…"
+          className="flex items-center gap-1.5 rounded-full border border-(--accent)/40 px-4 py-2 text-sm font-medium text-(--accent) transition hover:bg-(--accent-soft)"
+          icon={
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          }
+        >
           Delete event
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );

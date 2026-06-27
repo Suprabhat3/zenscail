@@ -8,6 +8,7 @@ import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
 import { listInboxMessages, getThread, header, getLabelData } from "@/lib/gmail";
 import { MailSidebar, MailFolderChips } from "@/components/mail/MailSidebar";
+import { MailNavProvider, MailBody } from "@/components/mail/MailNav";
 import {
   classifyMessages,
   getPriorities,
@@ -28,6 +29,8 @@ import { LocalDraftsList, type LocalDraft } from "@/components/mail/LocalDraftsL
 import { refreshInbox, trashMessageAction, archiveMessageAction } from "./actions";
 import { catchUpSchedules } from "./schedule-actions";
 import { processDueFollowUps, listSurfacedFollowUps } from "@/lib/followUp";
+import { getUserTimeZone, formatInTZ, ymdInTZ } from "@/lib/timezone";
+import { isDemoMode, getDemoMessages, getDemoPriorities, DEMO_USER } from "@/lib/demo";
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, low: 2 };
 
@@ -44,19 +47,18 @@ const BUNDLE_META: Record<Category, { emoji: string; title: string }> = {
 
 export const metadata = { title: "Mail — ZenScail" };
 
-function formatDate(value: string | number | null | undefined): string {
+function formatDate(value: string | number | null | undefined, tz: string): string {
   if (value == null) return "";
   const n = Number(value);
   const d = new Date(Number.isNaN(n) || n <= 0 ? String(value) : n);
   if (Number.isNaN(d.getTime())) return "";
-  const today = new Date();
-  return d.toDateString() === today.toDateString()
-    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return ymdInTZ(d.getTime(), tz) === ymdInTZ(Date.now(), tz)
+    ? formatInTZ(d, tz, { hour: "2-digit", minute: "2-digit" })
+    : formatInTZ(d, tz, { month: "short", day: "numeric" });
 }
 
-function formatWhen(d: Date): string {
-  return d.toLocaleString([], {
+function formatWhen(d: Date, tz: string): string {
+  return formatInTZ(d, tz, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -84,12 +86,43 @@ const FOLDERS: Record<string, FolderConfig> = {
   all: { title: "All Mail", labelIds: [] }, // empty = no label filter = all mail
 };
 
+// How many message refs to fetch per page. Gmail caps the per-message hydration
+// cost, so this is both the page size and the warm-cache batch size.
+const PAGE_SIZE = 25;
+
+// Cursor pagination state lives in the `pg` query param: a base64url-encoded JSON
+// array of the Gmail pageTokens traversed to reach the current page. Page 1 has
+// an empty stack. Gmail exposes only opaque forward cursors, so keeping the trail
+// in the URL is what makes a "Newer" (previous) button possible.
+function decodeTokenStack(pg: string | undefined): string[] {
+  if (!pg) return [];
+  try {
+    const arr: unknown = JSON.parse(Buffer.from(pg, "base64url").toString("utf8"));
+    return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+function encodeTokenStack(stack: string[]): string {
+  return Buffer.from(JSON.stringify(stack), "utf8").toString("base64url");
+}
+
 export default async function MailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; view?: string; folder?: string; label?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    view?: string;
+    folder?: string;
+    label?: string;
+    pg?: string;
+  }>;
 }) {
-  const { q, view, folder: folderParam, label: labelId } = await searchParams;
+  const { q, view, folder: folderParam, label: labelId, pg } = await searchParams;
+  const tokenStack = decodeTokenStack(pg);
+  const pageToken = tokenStack.length > 0 ? tokenStack[tokenStack.length - 1] : undefined;
+  const pageNumber = tokenStack.length + 1;
+  const firstPage = tokenStack.length === 0;
   const urgentFirst = view === "urgent";
   const unreadView = q === UNREAD_QUERY;
   const snoozedView = view === "snoozed";
@@ -98,37 +131,45 @@ export default async function MailPage({
   const folderKey = folderParam && FOLDERS[folderParam] ? folderParam : "inbox";
   const folder = FOLDERS[folderKey];
   const isInbox = folderKey === "inbox" && !labelId && !q;
-  const session = await requireSession();
-  const userId = session.user.id;
-  const tenantId = await ensureCorsairTenant(userId);
-  const t = corsairTenant(tenantId);
+  const demo = await isDemoMode();
+  const session = demo ? null : await requireSession();
+  const userId = session?.user.id ?? DEMO_USER.id;
+  let t: ReturnType<typeof corsairTenant> | null = null;
+  if (!demo) t = corsairTenant(await ensureCorsairTenant(userId));
 
-  // Sidebar data (custom labels + unread counts) — one labels.list call.
-  const labelData = await getLabelData(t).catch(() => ({ custom: [], unread: {} }));
+  const showFollowUps = !snoozedView && !scheduledView;
+
+  // Opportunistic catch-up (first page only): wake due snoozes, flush overdue
+  // sends, and resolve due follow-ups when the inbox opens, so the app works even
+  // where cron cadence is coarse. Runs before the inbox list so woken snoozes
+  // show up in it. Skipped while paging deeper to keep Newer/Older snappy.
+  if (firstPage && !demo) {
+    await Promise.all([
+      catchUpSchedules().catch(() => {}),
+      showFollowUps ? processDueFollowUps({ userId }).catch(() => {}) : Promise.resolve(),
+    ]);
+  }
+
+  // Sidebar labels, layout cookie, timezone, and the follow-up banner list are
+  // independent — fetch them concurrently instead of one await at a time.
+  const [labelData, layoutCookie, tz, surfacedFollowUps] = await Promise.all([
+    demo
+      ? Promise.resolve({ custom: [], unread: {} })
+      : getLabelData(t!).catch(() => ({ custom: [], unread: {} })),
+    cookies(),
+    getUserTimeZone(),
+    !demo && showFollowUps ? listSurfacedFollowUps(userId).catch(() => []) : Promise.resolve([]),
+  ]);
   const activeLabel = labelId
     ? labelData.custom.find((l) => l.id === labelId)
     : undefined;
-
   // Bundled vs flat layout preference (cookie, toggled client-side).
   const layout: "bundled" | "flat" =
-    (await cookies()).get("mail_layout")?.value === "flat" ? "flat" : "bundled";
+    layoutCookie.get("mail_layout")?.value === "flat" ? "flat" : "bundled";
   // Bundling only applies to the default inbox view; folders/tabs stay flat.
   const isDefaultView =
     isInbox && !urgentFirst && !unreadView && !snoozedView && !scheduledView;
   const bundled = isDefaultView && layout === "bundled";
-
-  // Opportunistic catch-up: wake due snoozes + flush overdue sends when the
-  // inbox opens, so the app works even where cron cadence is coarse.
-  await catchUpSchedules().catch(() => {});
-
-  // Follow-up reminders: opportunistically resolve/surface this user's due
-  // follow-ups on inbox render (the hourly cron is the backstop), then load
-  // the ones that need attention for the banner. Only on inbox-style views.
-  const showFollowUps = !snoozedView && !scheduledView;
-  if (showFollowUps) await processDueFollowUps({ userId }).catch(() => {});
-  const surfacedFollowUps = showFollowUps
-    ? await listSurfacedFollowUps(userId).catch(() => [])
-    : [];
 
   // "Inbox context" = the default inbox and its sub-views (Urgent/Unread).
   // Folders, labels, snoozed and scheduled each get their own flat list.
@@ -153,7 +194,7 @@ export default async function MailPage({
 
   // --- Snoozed view ---
   let snoozed: { threadId: string; subject: string; snippet: string; until: Date }[] = [];
-  if (snoozedView) {
+  if (snoozedView && !demo) {
     const rows = await prisma.snoozedThread.findMany({
       where: { userId },
       orderBy: { snoozeUntil: "asc" },
@@ -161,7 +202,7 @@ export default async function MailPage({
     });
     snoozed = await Promise.all(
       rows.map(async (r) => {
-        const res = await getThread(t, r.threadId).catch(() => null);
+        const res = await getThread(t!, r.threadId).catch(() => null);
         const first = res?.success ? res.data.messages?.[0] : undefined;
         return {
           threadId: r.threadId,
@@ -183,7 +224,7 @@ export default async function MailPage({
     isUndo: boolean;
     error: string | null;
   }[] = [];
-  if (scheduledView) {
+  if (scheduledView && !demo) {
     scheduled = await prisma.scheduledSend.findMany({
       where: { userId, status: { in: ["pending", "sending", "failed"] } },
       orderBy: { sendAt: "asc" },
@@ -194,7 +235,7 @@ export default async function MailPage({
 
   // --- Local (DB-backed) drafts, shown atop the Drafts folder ---
   let localDrafts: LocalDraft[] = [];
-  if (folderKey === "drafts" && !q) {
+  if (folderKey === "drafts" && !q && !demo) {
     const rows = await prisma.draft.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
@@ -210,7 +251,7 @@ export default async function MailPage({
         subject: d.subject,
         preview: text.slice(0, 120),
         isHtml: d.isHtml,
-        updatedAt: formatWhen(d.updatedAt),
+        updatedAt: formatWhen(d.updatedAt, tz),
       };
     });
   }
@@ -218,15 +259,20 @@ export default async function MailPage({
   // --- Inbox / search view ---
   let messages: Awaited<ReturnType<typeof listInboxMessages>>["messages"] = [];
   let priorities = new Map<string, RowMeta>();
-  if (!snoozedView && !scheduledView) {
+  let nextPageToken: string | undefined;
+  if (demo) {
+    messages = getDemoMessages();
+    priorities = getDemoPriorities();
+  } else if (!snoozedView && !scheduledView) {
     const listOpts = q
-      ? { query: q, limit: 25, userId }
+      ? { query: q, limit: PAGE_SIZE, userId, pageToken }
       : labelId
-        ? { labelIds: [labelId], limit: 25, userId }
-        : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: 25, userId };
-    const result = await listInboxMessages(t, listOpts);
+        ? { labelIds: [labelId], limit: PAGE_SIZE, userId, pageToken }
+        : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: PAGE_SIZE, userId, pageToken };
+    const result = await listInboxMessages(t!, listOpts);
     if (!result.ok) redirect("/connect");
     messages = result.messages;
+    nextPageToken = result.nextPageToken;
 
     await classifyMessages(userId, messages);
     priorities = await getPriorities(
@@ -277,10 +323,27 @@ export default async function MailPage({
     : scheduledView
       ? `${scheduled.length} queued send${scheduled.length === 1 ? "" : "s"}`
       : `${messages.length} message${messages.length === 1 ? "" : "s"}${
-          unreadCount > 0 && !unreadView ? ` · ${unreadCount} unread` : ""
-        }`;
+          pageNumber > 1 ? ` · page ${pageNumber}` : ""
+        }${unreadCount > 0 && !unreadView ? ` · ${unreadCount} unread` : ""}`;
+
+  // Cursor pagination links (Gmail-backed lists only). "Newer" pops the token
+  // stack, "Older" pushes the next cursor; both preserve the active view/query.
+  const pageParams = new URLSearchParams();
+  if (q) pageParams.set("q", q);
+  if (view) pageParams.set("view", view);
+  if (folderParam) pageParams.set("folder", folderParam);
+  if (labelId) pageParams.set("label", labelId);
+  const mkPageHref = (stack: string[]): string => {
+    const p = new URLSearchParams(pageParams);
+    if (stack.length > 0) p.set("pg", encodeTokenStack(stack));
+    const qs = p.toString();
+    return qs ? `/mail?${qs}` : "/mail";
+  };
+  const prevHref = !snoozedView && !scheduledView && pageNumber > 1 ? mkPageHref(tokenStack.slice(0, -1)) : null;
+  const nextHref = !snoozedView && !scheduledView && nextPageToken ? mkPageHref([...tokenStack, nextPageToken]) : null;
 
   return (
+    <MailNavProvider>
     <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <MailSidebar custom={labelData.custom} unread={labelData.unread} />
       <div className="min-w-0 flex-1">
@@ -387,10 +450,11 @@ export default async function MailPage({
       {folderKey === "drafts" && <LocalDraftsList drafts={localDrafts} />}
 
       {/* Body */}
+      <MailBody>
       {snoozedView ? (
-        <SnoozedList snoozed={snoozed} formatWhen={formatWhen} />
+        <SnoozedList snoozed={snoozed} formatWhen={(d) => formatWhen(d, tz)} />
       ) : scheduledView ? (
-        <ScheduledList scheduled={scheduled} formatWhen={formatWhen} />
+        <ScheduledList scheduled={scheduled} formatWhen={(d) => formatWhen(d, tz)} />
       ) : messages.length === 0 ? (
         folderKey === "drafts" && localDrafts.length > 0 ? null : (
         <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) px-4 py-20 text-center shadow-(--shadow-card)">
@@ -426,7 +490,7 @@ export default async function MailPage({
                   defaultOpen={b.category === "important" || b.category === "other"}
                 >
                   {b.messages.map((m) => (
-                    <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} />
+                    <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} tz={tz} />
                   ))}
                 </BundleSection>
               );
@@ -439,15 +503,48 @@ export default async function MailPage({
           <div className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
             <ul className="divide-y divide-(--line-soft)">
               {messages.map((m) => (
-                <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} />
+                <MessageRow key={m.id} m={m} p={priorities.get(m.id ?? "")} tz={tz} />
               ))}
             </ul>
           </div>
           <InboxTip />
         </>
       )}
+      {(prevHref || nextHref) && (
+        <nav className="mt-4 flex items-center justify-between gap-3" aria-label="Pagination">
+          {prevHref ? (
+            <Link
+              href={prevHref}
+              className="flex items-center gap-1.5 rounded-full border border-(--line) px-4 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              Newer
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="text-xs text-(--muted)">Page {pageNumber}</span>
+          {nextHref ? (
+            <Link
+              href={nextHref}
+              className="flex items-center gap-1.5 rounded-full border border-(--line) px-4 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+            >
+              Older
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
+      </MailBody>
       </div>
     </div>
+    </MailNavProvider>
   );
 }
 
@@ -462,7 +559,7 @@ function InboxTip() {
   );
 }
 
-function MessageRow({ m, p }: { m: InboxMessage; p?: RowMeta }) {
+function MessageRow({ m, p, tz }: { m: InboxMessage; p?: RowMeta; tz: string }) {
   const sender = parseSender(m.from || "");
   return (
     <li
@@ -494,7 +591,7 @@ function MessageRow({ m, p }: { m: InboxMessage; p?: RowMeta }) {
               <PriorityBadge priority={p.priority} reason={p.reason} />
             )}
           </span>
-          <span className="shrink-0 text-xs text-(--muted)">{formatDate(m.internalDate)}</span>
+          <span className="shrink-0 text-xs text-(--muted)">{formatDate(m.internalDate, tz)}</span>
         </div>
         <p
           className={`mt-0.5 truncate text-sm ${

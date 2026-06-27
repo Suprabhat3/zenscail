@@ -12,7 +12,9 @@ import "server-only";
  * `publish`/`subscribe` surface is designed to be swappable for that.
  */
 
-export type RealtimeEvent = {
+/** A Corsair feed change (gmail/calendar) — the client re-fetches that feed. */
+export type InboxRealtimeEvent = {
+  channel?: "inbox";
   /** Which Corsair plugin produced this. */
   plugin: "gmail" | "googlecalendar";
   /** Coarse event kind; the client just re-fetches the matching feed. */
@@ -20,6 +22,17 @@ export type RealtimeEvent = {
   /** Epoch ms, stamped by the publisher (webhook handler). */
   at: number;
 };
+
+/** A subscription change (e.g. admin granted Cloud) — the client celebrates. */
+export type SubscriptionRealtimeEvent = {
+  channel: "subscription";
+  /** What happened to the subscription. */
+  type: "granted" | "revoked";
+  /** Epoch ms, stamped by the publisher. */
+  at: number;
+};
+
+export type RealtimeEvent = InboxRealtimeEvent | SubscriptionRealtimeEvent;
 
 type Listener = (event: RealtimeEvent) => void;
 

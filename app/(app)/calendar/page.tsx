@@ -13,40 +13,39 @@ import {
 } from "@/lib/gcal";
 import { NowLine } from "@/components/calendar/NowLine";
 import { CalendarSidebar } from "@/components/calendar/CalendarSidebar";
+import { SubmitButton } from "@/components/app/SubmitButton";
+import { PendingLink } from "@/components/app/PendingLink";
+import {
+  getUserTimeZone,
+  formatInTZ,
+  partsInTZ,
+  ymdInTZ,
+  zonedToMs,
+  startOfDayMs,
+  startOfWeekMs,
+  startOfMonthMs,
+  addDaysMs,
+  addMonthsMs,
+} from "@/lib/timezone";
 import { refreshCalendar, createInstantMeet } from "./actions";
+import { isDemoMode, getDemoEvents } from "@/lib/demo";
 
 export const metadata = { title: "Calendar — ZenScail" };
 
 const PX_PER_HOUR = 56;
 type View = "day" | "week" | "month";
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}
-
-function startOfWeek(d: Date): Date {
-  const out = startOfDay(d);
-  const day = (out.getDay() + 6) % 7; // Monday = 0
-  out.setDate(out.getDate() - day);
-  return out;
-}
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function parseAnchor(s?: string): Date {
+/** Anchor day (`?date=YYYY-MM-DD`) as the viewer-local-midnight epoch, else today. */
+function parseAnchor(s: string | undefined, tz: string): number {
   if (s) {
     const [y, m, d] = s.split("-").map(Number);
-    if (y && m && d) return new Date(y, m - 1, d);
+    if (y && m && d) return zonedToMs(y, m, d, 0, 0, tz);
   }
-  return startOfDay(new Date());
+  return startOfDayMs(Date.now(), tz);
 }
 
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+function formatTime(ms: number, tz: string): string {
+  return formatInTZ(ms, tz, { hour: "numeric", minute: "2-digit" });
 }
 
 function hourLabel(h: number): string {
@@ -128,7 +127,7 @@ function layoutDay(
 }
 
 type DayData = {
-  date: Date;
+  dayMs: number; // viewer-local midnight of this day
   allDay: CachedEvent[];
   positioned: Positioned[];
 };
@@ -138,68 +137,78 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ view?: string; date?: string; week?: string }>;
 }) {
-  const { view: viewParam, date: dateParam, week } = await searchParams;
+  const demo = await isDemoMode();
+  // searchParams, session, and timezone are independent — resolve them together.
+  const [{ view: viewParam, date: dateParam, week }, session, tz] = await Promise.all([
+    searchParams,
+    demo ? Promise.resolve(null) : requireSession(),
+    getUserTimeZone(),
+  ]);
   const view: View =
     viewParam === "day" || viewParam === "month" ? viewParam : "week";
 
-  // Anchor date — `?date=YYYY-MM-DD`, with back-compat for old `?week=offset` links.
-  let anchor = parseAnchor(dateParam);
+  // Anchor day as a viewer-local-midnight epoch — `?date=YYYY-MM-DD`, with
+  // back-compat for old `?week=offset` links.
+  let anchorMs = parseAnchor(dateParam, tz);
   if (!dateParam && week) {
-    anchor = startOfWeek(new Date());
-    anchor.setDate(anchor.getDate() + (Number(week) || 0) * 7);
+    anchorMs = addDaysMs(startOfWeekMs(new Date().getTime(), tz), (Number(week) || 0) * 7, tz);
   }
 
-  const session = await requireSession();
-  const tenantId = await ensureCorsairTenant(session.user.id);
-  const t = corsairTenant(tenantId);
-
-  // Compute the visible range for the active view.
-  let rangeStart: Date;
-  let rangeEnd: Date;
-  let gridStart: Date; // month grid (Mon-first, 6 weeks)
+  // Compute the visible range for the active view (all epoch ms, in the viewer's zone).
+  let rangeStartMs: number;
+  let rangeEndMs: number;
+  let gridStartMs: number; // month grid (Mon-first, 6 weeks)
   if (view === "day") {
-    rangeStart = startOfDay(anchor);
-    rangeEnd = new Date(rangeStart);
-    rangeEnd.setDate(rangeEnd.getDate() + 1);
-    gridStart = rangeStart;
+    rangeStartMs = startOfDayMs(anchorMs, tz);
+    rangeEndMs = addDaysMs(rangeStartMs, 1, tz);
+    gridStartMs = rangeStartMs;
   } else if (view === "month") {
-    const monthFirst = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    gridStart = new Date(monthFirst);
-    gridStart.setDate(gridStart.getDate() - ((monthFirst.getDay() + 6) % 7));
-    rangeStart = gridStart;
-    rangeEnd = new Date(gridStart);
-    rangeEnd.setDate(rangeEnd.getDate() + 42);
+    const monthFirstMs = startOfMonthMs(anchorMs, tz);
+    gridStartMs = addDaysMs(monthFirstMs, -partsInTZ(monthFirstMs, tz).weekday, tz);
+    rangeStartMs = gridStartMs;
+    rangeEndMs = addDaysMs(gridStartMs, 42, tz);
   } else {
-    rangeStart = startOfWeek(anchor);
-    rangeEnd = new Date(rangeStart);
-    rangeEnd.setDate(rangeEnd.getDate() + 7);
-    gridStart = rangeStart;
+    rangeStartMs = startOfWeekMs(anchorMs, tz);
+    rangeEndMs = addDaysMs(rangeStartMs, 7, tz);
+    gridStartMs = rangeStartMs;
   }
 
-  const [{ ok, messages: events }, calendars] = await Promise.all([
-    listEvents(t, { rangeStart, rangeEnd }),
-    listCalendars(t).catch(() => []),
-  ]);
-  if (!ok) redirect("/connect");
+  let events: CachedEvent[];
+  let calendars: Awaited<ReturnType<typeof listCalendars>> = [];
+  if (demo) {
+    events = getDemoEvents();
+  } else {
+    const tenantId = await ensureCorsairTenant(session!.user.id);
+    const t = corsairTenant(tenantId);
+    const [eventsRes, cals] = await Promise.all([
+      listEvents(t, { rangeStart: new Date(rangeStartMs), rangeEnd: new Date(rangeEndMs) }),
+      listCalendars(t).catch(() => []),
+    ]);
+    if (!eventsRes.ok) redirect("/connect");
+    events = eventsRes.messages;
+    calendars = cals;
+  }
 
-  const today = ymd(new Date());
+  const today = ymdInTZ(new Date().getTime(), tz);
 
   // Prev / next / today navigation hrefs.
   const shift = (delta: number): string => {
-    const d = new Date(anchor);
-    if (view === "day") d.setDate(d.getDate() + delta);
-    else if (view === "month") d.setMonth(d.getMonth() + delta);
-    else d.setDate(d.getDate() + delta * 7);
-    return `/calendar?view=${view}&date=${ymd(d)}`;
+    const ms =
+      view === "day"
+        ? addDaysMs(anchorMs, delta, tz)
+        : view === "month"
+          ? addMonthsMs(anchorMs, delta, tz)
+          : addDaysMs(anchorMs, delta * 7, tz);
+    return `/calendar?view=${view}&date=${ymdInTZ(ms, tz)}`;
   };
 
   // Title per view.
   const title =
     view === "day"
-      ? anchor.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })
+      ? formatInTZ(anchorMs, tz, { weekday: "long", month: "long", day: "numeric" })
       : view === "month"
-        ? anchor.toLocaleDateString([], { month: "long", year: "numeric" })
-        : rangeStart.toLocaleDateString([], { month: "long", year: "numeric" });
+        ? formatInTZ(anchorMs, tz, { month: "long", year: "numeric" })
+        : formatInTZ(rangeStartMs, tz, { month: "long", year: "numeric" });
 
   return (
     <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -215,39 +224,44 @@ export default async function CalendarPage({
             {/* View switcher */}
             <div className="flex items-center overflow-hidden rounded-full border border-(--line) bg-(--paper) text-sm">
               {(["day", "week", "month"] as View[]).map((v) => (
-                <Link
+                <PendingLink
                   key={v}
-                  href={`/calendar?view=${v}&date=${ymd(anchor)}`}
-                  className={`px-3.5 py-2 font-semibold capitalize transition hover:bg-(--bg-deep) ${
-                    view === v ? "bg-(--ink) text-(--bg)" : "text-(--ink-soft)"
+                  href={`/calendar?view=${v}&date=${ymdInTZ(anchorMs, tz)}`}
+                  className={`px-3.5 py-2 font-semibold capitalize transition ${
+                    view === v
+                      ? "bg-(--ink) text-(--bg) hover:bg-(--accent)"
+                      : "text-(--ink-soft) hover:bg-(--bg-deep) hover:text-(--ink)"
                   }`}
                 >
                   {v}
-                </Link>
+                </PendingLink>
               ))}
             </div>
             {/* Prev / Today / Next */}
             <div className="flex items-center overflow-hidden rounded-full border border-(--line) bg-(--paper)">
-              <Link href={shift(-1)} aria-label="Previous" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
+              <PendingLink href={shift(-1)} ariaLabel="Previous" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
                 ←
-              </Link>
-              <Link href={`/calendar?view=${view}`} className="border-x border-(--line-soft) px-3.5 py-2 text-sm font-semibold text-(--ink-soft) transition hover:bg-(--bg-deep)">
+              </PendingLink>
+              <PendingLink href={`/calendar?view=${view}`} className="border-x border-(--line-soft) px-3.5 py-2 text-sm font-semibold text-(--ink-soft) transition hover:bg-(--bg-deep)">
                 Today
-              </Link>
-              <Link href={shift(1)} aria-label="Next" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
+              </PendingLink>
+              <PendingLink href={shift(1)} ariaLabel="Next" className="px-3 py-2 text-sm text-(--ink-soft) transition hover:bg-(--bg-deep) hover:text-(--ink)">
                 →
-              </Link>
+              </PendingLink>
             </div>
             <form action={refreshCalendar}>
-              <button
+              <SubmitButton
                 title="Sync with Google Calendar"
+                pendingLabel="Syncing…"
                 className="flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
+                  </svg>
+                }
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
-                </svg>
                 Refresh
-              </button>
+              </SubmitButton>
             </form>
             <Link
               href="/calendar/links"
@@ -260,16 +274,19 @@ export default async function CalendarPage({
               Booking links
             </Link>
             <form action={createInstantMeet}>
-              <button
+              <SubmitButton
                 title="Start an instant Google Meet now"
+                pendingLabel="Starting…"
                 className="flex items-center gap-1.5 rounded-full border border-(--line) px-3.5 py-2 text-sm font-medium text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="m23 7-7 5 7 5V7z" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" />
+                  </svg>
+                }
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="m23 7-7 5 7 5V7z" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" />
-                </svg>
                 Meet now
-              </button>
+              </SubmitButton>
             </form>
             <Link
               href="/calendar/new"
@@ -284,9 +301,21 @@ export default async function CalendarPage({
         </div>
 
         {view === "month" ? (
-          <MonthView events={events} gridStart={gridStart} anchorMonth={anchor.getMonth()} today={today} />
+          <MonthView
+            events={events}
+            gridStartMs={gridStartMs}
+            anchorMonth={partsInTZ(anchorMs, tz).month}
+            today={today}
+            tz={tz}
+          />
         ) : (
-          <TimeView events={events} rangeStart={rangeStart} days={view === "day" ? 1 : 7} today={today} />
+          <TimeView
+            events={events}
+            rangeStartMs={rangeStartMs}
+            days={view === "day" ? 1 : 7}
+            today={today}
+            tz={tz}
+          />
         )}
 
         {events.length === 0 && (
@@ -306,39 +335,39 @@ export default async function CalendarPage({
 /** Day & week time grids share this component (1 or 7 columns). */
 function TimeView({
   events,
-  rangeStart,
+  rangeStartMs,
   days: dayCount,
   today,
+  tz,
 }: {
   events: CachedEvent[];
-  rangeStart: Date;
+  rangeStartMs: number;
   days: number;
   today: string;
+  tz: string;
 }) {
   // Visible hour window: 7–20 by default, widened to fit this range's events.
   let startHour = 7;
   let endHour = 20;
   for (const e of events) {
     if (isAllDay(e)) continue;
-    const s = new Date(eventStartMillis(e));
-    const en = new Date(eventEndMillis(e));
-    startHour = Math.min(startHour, s.getHours());
-    endHour = Math.max(endHour, Math.min(en.getHours() + (en.getMinutes() > 0 ? 1 : 0), 24));
+    const s = partsInTZ(eventStartMillis(e), tz);
+    const en = partsInTZ(eventEndMillis(e), tz);
+    startHour = Math.min(startHour, s.hour);
+    endHour = Math.max(endHour, Math.min(en.hour + (en.minute > 0 ? 1 : 0), 24));
   }
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
 
   const days: DayData[] = Array.from({ length: dayCount }, (_, i) => {
-    const date = new Date(rangeStart);
-    date.setDate(date.getDate() + i);
-    const dayStart = date.getTime();
-    const dayEnd = dayStart + 86400_000;
+    const dayMs = addDaysMs(rangeStartMs, i, tz);
+    const dayEnd = addDaysMs(dayMs, 1, tz);
     const dayEvents = events.filter(
-      (e) => eventEndMillis(e) > dayStart && eventStartMillis(e) < dayEnd,
+      (e) => eventEndMillis(e) > dayMs && eventStartMillis(e) < dayEnd,
     );
     return {
-      date,
+      dayMs,
       allDay: dayEvents.filter(isAllDay),
-      positioned: layoutDay(dayEvents, dayStart, startHour, endHour),
+      positioned: layoutDay(dayEvents, dayMs, startHour, endHour),
     };
   });
 
@@ -353,24 +382,24 @@ function TimeView({
         {/* Day headers */}
         <div className={`grid ${cols} border-b border-(--line-soft) bg-(--bg)`}>
           <div />
-          {days.map(({ date }) => {
-            const isToday = ymd(date) === today;
+          {days.map(({ dayMs }) => {
+            const isToday = ymdInTZ(dayMs, tz) === today;
             return (
               <Link
-                key={date.toISOString()}
-                href={`/calendar/new?date=${ymd(date)}`}
+                key={dayMs}
+                href={`/calendar/new?date=${ymdInTZ(dayMs, tz)}`}
                 title="New event on this day"
                 className="group border-l border-(--line-soft) px-2 py-2.5 text-center transition hover:bg-(--bg-deep)"
               >
                 <div className="text-[10px] font-bold tracking-widest text-(--muted) uppercase">
-                  {date.toLocaleDateString([], { weekday: "short" })}
+                  {formatInTZ(dayMs, tz, { weekday: "short" })}
                 </div>
                 <div
                   className={`mx-auto mt-0.5 flex h-8 w-8 items-center justify-center rounded-full font-serif text-lg ${
                     isToday ? "bg-(--accent) text-white" : "text-(--ink) group-hover:bg-(--paper)"
                   }`}
                 >
-                  {date.getDate()}
+                  {partsInTZ(dayMs, tz).day}
                 </div>
               </Link>
             );
@@ -383,8 +412,8 @@ function TimeView({
             <div className="py-1.5 pr-2 text-right text-[10px] font-semibold text-(--muted)">
               all day
             </div>
-            {days.map(({ date, allDay }) => (
-              <div key={date.toISOString()} className="space-y-1 border-l border-(--line-soft) p-1">
+            {days.map(({ dayMs, allDay }) => (
+              <div key={dayMs} className="space-y-1 border-l border-(--line-soft) p-1">
                 {allDay.map((e, idx) => (
                   <Link
                     key={`${e.id}-${idx}`}
@@ -415,11 +444,11 @@ function TimeView({
           </div>
 
           {/* Day columns */}
-          {days.map(({ date, positioned }) => {
-            const isToday = ymd(date) === today;
+          {days.map(({ dayMs, positioned }) => {
+            const isToday = ymdInTZ(dayMs, tz) === today;
             return (
               <div
-                key={date.toISOString()}
+                key={dayMs}
                 className={`relative border-l border-(--line-soft) ${isToday ? "bg-(--accent-soft)/25" : ""}`}
                 style={{ height: hours.length * PX_PER_HOUR }}
               >
@@ -431,8 +460,8 @@ function TimeView({
                   />
                 ))}
                 <Link
-                  href={`/calendar/new?date=${ymd(date)}`}
-                  aria-label={`New event on ${date.toDateString()}`}
+                  href={`/calendar/new?date=${ymdInTZ(dayMs, tz)}`}
+                  aria-label={`New event on ${formatInTZ(dayMs, tz, { weekday: "long", month: "long", day: "numeric" })}`}
                   className="absolute inset-0"
                 />
                 {isToday && <NowLine startHour={startHour} endHour={endHour} pxPerHour={PX_PER_HOUR} />}
@@ -453,7 +482,7 @@ function TimeView({
                     </div>
                     {height >= 36 && (
                       <div className="truncate text-[10px] font-semibold opacity-70">
-                        {formatTime(eventStartMillis(e))} – {formatTime(eventEndMillis(e))}
+                        {formatTime(eventStartMillis(e), tz)} – {formatTime(eventEndMillis(e), tz)}
                       </div>
                     )}
                     {height >= 56 && e.location && (
@@ -473,24 +502,24 @@ function TimeView({
 /** Month grid: 6 weeks × 7 days, events as compact chips. */
 function MonthView({
   events,
-  gridStart,
+  gridStartMs,
   anchorMonth,
   today,
+  tz,
 }: {
   events: CachedEvent[];
-  gridStart: Date;
-  anchorMonth: number;
+  gridStartMs: number;
+  anchorMonth: number; // 1-based
   today: string;
+  tz: string;
 }) {
   const cells = Array.from({ length: 42 }, (_, i) => {
-    const date = new Date(gridStart);
-    date.setDate(date.getDate() + i);
-    const dayStart = date.getTime();
-    const dayEnd = dayStart + 86400_000;
+    const dayMs = addDaysMs(gridStartMs, i, tz);
+    const dayEnd = addDaysMs(dayMs, 1, tz);
     const dayEvents = events
-      .filter((e) => eventEndMillis(e) > dayStart && eventStartMillis(e) < dayEnd)
+      .filter((e) => eventEndMillis(e) > dayMs && eventStartMillis(e) < dayEnd)
       .sort((a, b) => eventStartMillis(a) - eventStartMillis(b));
-    return { date, events: dayEvents };
+    return { dayMs, events: dayEvents };
   });
 
   return (
@@ -503,9 +532,9 @@ function MonthView({
         ))}
       </div>
       <div className="grid grid-cols-7">
-        {cells.map(({ date, events: dayEvents }, i) => {
-          const inMonth = date.getMonth() === anchorMonth;
-          const isToday = ymd(date) === today;
+        {cells.map(({ dayMs, events: dayEvents }, i) => {
+          const inMonth = partsInTZ(dayMs, tz).month === anchorMonth;
+          const isToday = ymdInTZ(dayMs, tz) === today;
           return (
             <div
               key={i}
@@ -513,8 +542,8 @@ function MonthView({
                 i % 7 === 0 ? "border-l-0" : ""
               } ${inMonth ? "" : "bg-(--bg)/40"}`}
             >
-              <Link
-                href={`/calendar?view=day&date=${ymd(date)}`}
+              <PendingLink
+                href={`/calendar?view=day&date=${ymdInTZ(dayMs, tz)}`}
                 className="flex items-center justify-end"
               >
                 <span
@@ -522,9 +551,9 @@ function MonthView({
                     isToday ? "bg-(--accent) text-white" : inMonth ? "text-(--ink-soft)" : "text-(--muted)/60"
                   }`}
                 >
-                  {date.getDate()}
+                  {partsInTZ(dayMs, tz).day}
                 </span>
-              </Link>
+              </PendingLink>
               <div className="mt-1 space-y-0.5">
                 {dayEvents.slice(0, 3).map((e, idx) => (
                   <Link
@@ -533,18 +562,18 @@ function MonthView({
                     className={`block truncate rounded border-l-2 px-1.5 py-0.5 text-[11px] font-medium transition hover:opacity-80 ${eventColor(e.id, idx).chip}`}
                   >
                     {!isAllDay(e) && (
-                      <span className="font-semibold opacity-70">{formatTime(eventStartMillis(e))} </span>
+                      <span className="font-semibold opacity-70">{formatTime(eventStartMillis(e), tz)} </span>
                     )}
                     {e.summary || "(no title)"}
                   </Link>
                 ))}
                 {dayEvents.length > 3 && (
-                  <Link
-                    href={`/calendar?view=day&date=${ymd(date)}`}
+                  <PendingLink
+                    href={`/calendar?view=day&date=${ymdInTZ(dayMs, tz)}`}
                     className="block px-1.5 text-[10px] font-semibold text-(--muted) hover:text-(--ink)"
                   >
                     +{dayEvents.length - 3} more
-                  </Link>
+                  </PendingLink>
                 )}
               </div>
             </div>

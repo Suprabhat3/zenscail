@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { GmailLabel } from "@/lib/gmail";
+import { FolderNavReporter } from "./MailNav";
 
 type IconName =
   | "inbox"
@@ -184,6 +185,7 @@ export function MailSidebar({
               {count > 0 && (
                 <span className="shrink-0 text-xs font-semibold tabular-nums">{count}</span>
               )}
+              <FolderNavReporter id={f.href} label={f.label} />
             </Link>
           );
         })}
@@ -214,6 +216,7 @@ export function MailSidebar({
                   {l.unread > 0 && (
                     <span className="shrink-0 text-xs font-semibold tabular-nums">{l.unread}</span>
                   )}
+                  <FolderNavReporter id={`label-${l.id}`} label={l.name} />
                 </Link>
               );
             })}
@@ -270,6 +273,7 @@ export function MailFolderChips({
             </span>
             {f.label}
             {count > 0 && <span className="text-xs font-semibold tabular-nums">{count}</span>}
+            <FolderNavReporter id={`chip-${f.href}`} label={f.label} />
           </Link>
         );
       })}
@@ -290,6 +294,7 @@ export function MailFolderChips({
             </span>
             {l.name}
             {l.unread > 0 && <span className="text-xs font-semibold tabular-nums">{l.unread}</span>}
+            <FolderNavReporter id={`chip-label-${l.id}`} label={l.name} />
           </Link>
         );
       })}

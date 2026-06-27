@@ -12,8 +12,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-zenscail}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # Not published to the host — only the app talks to it over the
-    # internal compose network. Expose a port here only for debugging.
+    # TEMP: published to the host for external DB tooling (Studio).
+    # ⚠️ Exposes Postgres on the public IP — only the password protects it.
+    # Restrict port 5432 to your IP in the AWS security group, and remove
+    # this block when done debugging.
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zenscail} -d ${POSTGRES_DB:-zenscail}"]
       interval: 10s

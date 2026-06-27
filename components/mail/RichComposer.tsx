@@ -295,7 +295,7 @@ export function RichComposer({
             suppressContentEditableWarning
             onInput={onEditorInput}
             data-placeholder="Write your message…"
-            className={`zs-rich min-h-[18rem] text-sm leading-relaxed text-(--ink) focus:outline-none ${className}`}
+            className={`zs-rich min-h-72 text-sm leading-relaxed text-(--ink) focus:outline-none ${className}`}
           />
           <input type="hidden" name="body" value={richHtml} />
           <style>{`

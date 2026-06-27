@@ -8,30 +8,34 @@ import {
   getThreadCached,
   markThreadRead,
   extractBodies,
+  extractAttachments,
   header,
   type GmailMessage,
 } from "@/lib/gmail";
+import { formatBytes } from "@/lib/attachments";
 import { markThreadReadInCache, putCachedThread } from "@/lib/mailCache";
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
 import { ThreadAiActions } from "@/components/mail/ThreadAiActions";
 import { EmailFrame } from "@/components/mail/EmailFrame";
 import { SnoozeMenu } from "@/components/mail/SnoozeMenu";
 import { SendBar } from "@/components/mail/SendBar";
+import { AttachmentsProvider } from "@/components/mail/AttachmentsContext";
+import { AttachmentField } from "@/components/mail/AttachmentField";
 import { ReplyChips } from "@/components/mail/ReplyChips";
 import { FollowUpButton } from "@/components/mail/FollowUpButton";
 import { SummaryBanner } from "@/components/mail/SummaryBanner";
 import { getFollowUp } from "@/lib/followUp";
 import { getEmailSummaryFor } from "@/lib/ai/summary";
+import { getUserTimeZone, formatInTZ, partsInTZ } from "@/lib/timezone";
 
 export const metadata = { title: "Thread — ZenScail" };
 
 /** "Thu, 12 Jun 2026 08:13:22 +0530 (IST)" → "Jun 12, 8:13 AM" (raw on parse failure). */
-function formatHeaderDate(raw: string): string {
+function formatHeaderDate(raw: string, tz: string): string {
   const ms = Date.parse(raw);
   if (Number.isNaN(ms)) return raw;
-  const d = new Date(ms);
-  const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleString([], {
+  const sameYear = partsInTZ(ms, tz).year === partsInTZ(Date.now(), tz).year;
+  return formatInTZ(ms, tz, {
     month: "short",
     day: "numeric",
     ...(sameYear ? {} : { year: "numeric" }),
@@ -43,14 +47,17 @@ function formatHeaderDate(raw: string): string {
 function MessageCard({
   message,
   defaultOpen,
+  tz,
 }: {
   message: GmailMessage;
   defaultOpen: boolean;
+  tz: string;
 }) {
   const from = header(message.payload, "From");
   const sender = parseSender(from);
-  const date = formatHeaderDate(header(message.payload, "Date"));
+  const date = formatHeaderDate(header(message.payload, "Date"), tz);
   const bodies = extractBodies(message.payload);
+  const attachments = message.id ? extractAttachments(message.payload) : [];
 
   return (
     <details
@@ -96,6 +103,44 @@ function MessageCard({
               {bodies.text || message.snippet}
             </pre>
           )}
+
+          {attachments.length > 0 && (
+            <div className="mt-4 border-t border-(--line-soft) pt-3">
+              <p className="mb-2 text-[11px] font-bold tracking-wider text-(--muted) uppercase">
+                {attachments.length} attachment{attachments.length === 1 ? "" : "s"}
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                {attachments.map((a) => (
+                  <li key={a.attachmentId}>
+                    {/* Downloading bytes requires a Gmail op Corsair doesn't
+                        expose, so we link out to the message in Gmail where the
+                        attachment can be opened/downloaded directly. */}
+                    <a
+                      href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(message.id!)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open “${a.filename}” in Gmail`}
+                      className="flex items-center gap-2 rounded-lg border border-(--line) bg-(--bg) px-3 py-2 text-xs text-(--ink-soft) transition hover:border-(--ink) hover:text-(--ink)"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 text-(--muted)">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                      </svg>
+                      <span className="max-w-56 truncate">{a.filename}</span>
+                      {a.size > 0 && (
+                        <span className="text-(--muted)">{formatBytes(a.size)}</span>
+                      )}
+                      <span className="ml-0.5 flex items-center gap-1 text-(--muted)">
+                        <span>Open in Gmail</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+                          <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        </svg>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </details>
@@ -109,6 +154,7 @@ export default async function ThreadPage({
 }) {
   const { id } = await params;
   const session = await requireSession();
+  const tz = await getUserTimeZone();
   const identity = await getAppIdentityForUser(session.user.id, session.user);
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
@@ -227,7 +273,7 @@ export default async function ThreadPage({
       {/* Messages — older ones collapsed, latest expanded */}
       <div className="mt-6 space-y-3">
         {messages.map((m, i) => (
-          <MessageCard key={m.id ?? i} message={m} defaultOpen={i === messages.length - 1} />
+          <MessageCard key={m.id ?? i} message={m} defaultOpen={i === messages.length - 1} tz={tz} />
         ))}
       </div>
 
@@ -236,6 +282,7 @@ export default async function ThreadPage({
 
       {/* Reply form */}
       <form className="mt-4 overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) p-5 shadow-(--shadow-card)">
+      <AttachmentsProvider>
         <h2 className="flex items-center gap-2 text-[11.5px] font-bold tracking-widest text-(--accent) uppercase">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M9 17H4v-5l9.5-9.5a3.54 3.54 0 0 1 5 5L9 17ZM21 21H8" />
@@ -266,10 +313,14 @@ export default async function ThreadPage({
           placeholder="Write your reply…"
           className="mt-3 w-full resize-y rounded-xl border border-(--line) bg-(--bg) px-4 py-3 text-sm leading-relaxed text-(--ink) placeholder:text-(--muted) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)"
         />
+        <div className="mt-3">
+          <AttachmentField />
+        </div>
         <div className="mt-3 flex items-center justify-end gap-3 sm:justify-between">
           <p className="hidden text-xs text-(--muted) sm:block">Sends from your connected Gmail · Undo for a few seconds.</p>
           <SendBar successHref={`/mail/thread/${thread.id ?? id}`} label="Send reply" />
         </div>
+      </AttachmentsProvider>
       </form>
     </div>
   );

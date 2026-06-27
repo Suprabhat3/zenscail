@@ -9,21 +9,38 @@ export function isActiveStatus(status: string | null | undefined): boolean {
   return Boolean(status && ACTIVE_STATUSES.has(status));
 }
 
+/**
+ * Whether the subscription grants Cloud access *right now*. Unlike
+ * `isActiveStatus`, this also enforces the paid period: an active row whose
+ * `currentEnd` has passed (e.g. an admin grant that lapsed, or a Razorpay
+ * period that wasn't renewed) no longer counts. A null `currentEnd` is treated
+ * as non-expiring so legacy rows without a period aren't locked out.
+ */
+export function hasCloudAccess(
+  sub: { status: string; currentEnd: Date | null } | null | undefined,
+): boolean {
+  if (!isActiveStatus(sub?.status)) return false;
+  const end = sub?.currentEnd ?? null;
+  return !end || end.getTime() > Date.now();
+}
+
 /** Whether the user currently has an active Cloud subscription. */
 export async function hasActiveSubscription(userId: string): Promise<boolean> {
   const sub = await prisma.subscription.findUnique({
     where: { userId },
-    select: { status: true },
+    select: { status: true, currentEnd: true },
   });
-  return isActiveStatus(sub?.status);
+  return hasCloudAccess(sub);
 }
 
 /**
  * Map the row to whether the user may use the Cloud tier right now.
  * Used by the (app) gate and the AI registry.
  */
-export function cloudAccessFrom(sub: { status: string } | null | undefined): boolean {
-  return isActiveStatus(sub?.status);
+export function cloudAccessFrom(
+  sub: { status: string; currentEnd: Date | null } | null | undefined,
+): boolean {
+  return hasCloudAccess(sub);
 }
 
 export type BillingState = {
@@ -65,7 +82,7 @@ export async function getBillingState(userId: string): Promise<BillingState> {
     tier: aiSettings?.tier === "byok" ? "byok" : "cloud",
     hasSubscription: Boolean(sub),
     status: sub?.status ?? null,
-    isActive: isActiveStatus(sub?.status),
+    isActive: hasCloudAccess(sub),
     cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
     currentEnd,
     daysRemaining,
