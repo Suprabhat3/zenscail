@@ -12,6 +12,30 @@ function appOrigin(): string {
 }
 
 /**
+ * The only Google scopes our Cloud Console verification submission covers.
+ * Corsair's gmail plugin asks for gmail.modify + labels + send + compose, but
+ * gmail.modify already covers every operation we make (read, send, trash,
+ * label changes), so we narrow the request to it — the consent screen must
+ * match the verified scope list exactly or Google rejects the app.
+ */
+const VERIFIED_SCOPES: Record<ConnectPlugin, string[]> = {
+  gmail: ["https://www.googleapis.com/auth/gmail.modify"],
+  googlecalendar: ["https://www.googleapis.com/auth/calendar"],
+};
+
+/** Replace the scope param on Corsair's Google authorize URL with our verified set. */
+function narrowScopes(authorizeUrl: string, plugin: ConnectPlugin): string {
+  const url = new URL(authorizeUrl);
+  if (url.hostname !== "accounts.google.com" || !url.searchParams.has("scope")) {
+    throw new Error(
+      `Unexpected authorize URL shape for ${plugin}; refusing to request unverified scopes`,
+    );
+  }
+  url.searchParams.set("scope", VERIFIED_SCOPES[plugin].join(" "));
+  return url.toString();
+}
+
+/**
  * Direct OAuth authorize URL for a single plugin, returning the user to our
  * own callback page (not a Corsair-hosted page). The callback chains to the
  * next plugin, then closes the popup — so the connect flow stays in our app.
@@ -31,21 +55,5 @@ export async function createAuthorizeUrl(
     returnTo,
   );
 
-  return { url: authorizeUrl };
-}
-
-/**
- * Create a Corsair-hosted connect link for both plugins. Kept as a fallback
- * for when the popup is blocked — the user opens it in a new tab instead.
- */
-export async function createConnectLink(): Promise<{ url: string }> {
-  const session = await requireSession();
-  const tenantId = await ensureCorsairTenant(session.user.id);
-
-  const link = await corsairTenant(tenantId).connectLink.create({
-    plugins: [...CONNECT_PLUGINS],
-    ttlMs: 30 * 60 * 1000,
-  });
-
-  return { url: link.url };
+  return { url: narrowScopes(authorizeUrl, plugin) };
 }
