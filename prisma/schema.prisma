@@ -147,6 +147,27 @@ model CachedThread {
   @@map("cached_thread")
 }
 
+/// A newsletter sender the user has unsubscribed from via the Subscriptions
+/// page. Presence of a row = "done" (shown as unsubscribed, excluded from the
+/// active list). `method` records how it was executed; for "link" the user
+/// still has to open `link` in the browser to finish (no machine-actionable
+/// one-click/mailto target existed).
+model UnsubscribedSender {
+  id         Int      @id @default(autoincrement())
+  userId     String   @map("user_id")
+  // Lower-cased bare email address of the sender (the grouping key).
+  senderAddr String   @map("sender_addr")
+  senderName String?  @map("sender_name")
+  // "one-click" | "mailto" | "link"
+  method     String
+  // The http(s) unsubscribe URL, kept when the user must finish manually.
+  link       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, senderAddr])
+  @@map("unsubscribed_sender")
+}
+
 model Conversation {
   // Client-generated UUID so the dock can persist before the first round-trip.
   id        String        @id

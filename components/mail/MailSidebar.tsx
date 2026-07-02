@@ -16,6 +16,7 @@ type IconName =
   | "spam"
   | "trash"
   | "all"
+  | "unsub"
   | "label";
 
 function Icon({ name }: { name: IconName }) {
@@ -96,6 +97,14 @@ function Icon({ name }: { name: IconName }) {
           <path d="M3 9h18M9 21V9" />
         </svg>
       );
+    case "unsub":
+      return (
+        <svg {...common}>
+          <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9" />
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+          <path d="m17 17 4 4m0-4-4 4" />
+        </svg>
+      );
     case "label":
       return (
         <svg {...common}>
@@ -120,6 +129,7 @@ const FOLDERS: FolderDef[] = [
   { label: "Inbox", icon: "inbox", href: "/mail", countLabel: "INBOX", match: "inbox" },
   { label: "Starred", icon: "star", href: "/mail?folder=starred", match: "starred" },
   { label: "Snoozed", icon: "clock", href: "/mail?view=snoozed", match: "snoozed" },
+  { label: "Subscriptions", icon: "unsub", href: "/mail/subscriptions", match: "subscriptions" },
   { label: "Important", icon: "important", href: "/mail?folder=important", match: "important" },
   { label: "Sent", icon: "sent", href: "/mail?folder=sent", match: "sent" },
   { label: "Scheduled", icon: "schedule", href: "/mail?view=scheduled", match: "scheduled" },
@@ -145,7 +155,8 @@ export function MailSidebar({
 
   // Which folder is active right now.
   let active = "";
-  if (pathname === "/mail") {
+  if (pathname === "/mail/subscriptions") active = "subscriptions";
+  else if (pathname === "/mail") {
     if (view === "snoozed") active = "snoozed";
     else if (view === "scheduled") active = "scheduled";
     else if (folder) active = folder;
@@ -246,7 +257,8 @@ export function MailFolderChips({
   const q = params.get("q");
 
   let active = "";
-  if (pathname === "/mail") {
+  if (pathname === "/mail/subscriptions") active = "subscriptions";
+  else if (pathname === "/mail") {
     if (view === "snoozed") active = "snoozed";
     else if (view === "scheduled") active = "scheduled";
     else if (folder) active = folder;
