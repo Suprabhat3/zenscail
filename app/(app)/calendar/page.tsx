@@ -4,12 +4,12 @@ import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import {
-  listEvents,
-  listCalendars,
+  listEventsCached,
   eventStartMillis,
   eventEndMillis,
   isAllDay,
   type CachedEvent,
+  type CalendarSummary,
 } from "@/lib/gcal";
 import { NowLine } from "@/components/calendar/NowLine";
 import { CalendarSidebar } from "@/components/calendar/CalendarSidebar";
@@ -174,19 +174,19 @@ export default async function CalendarPage({
   }
 
   let events: CachedEvent[];
-  let calendars: Awaited<ReturnType<typeof listCalendars>> = [];
+  let calendars: CalendarSummary[] = [];
   if (demo) {
     events = getDemoEvents();
   } else {
     const tenantId = await ensureCorsairTenant(session!.user.id);
     const t = corsairTenant(tenantId);
-    const [eventsRes, cals] = await Promise.all([
-      listEvents(t, { rangeStart: new Date(rangeStartMs), rangeEnd: new Date(rangeEndMs) }),
-      listCalendars(t).catch(() => []),
-    ]);
+    const eventsRes = await listEventsCached(t, session!.user.id, {
+      rangeStart: new Date(rangeStartMs),
+      rangeEnd: new Date(rangeEndMs),
+    });
     if (!eventsRes.ok) redirect("/connect");
     events = eventsRes.messages;
-    calendars = cals;
+    calendars = eventsRes.calendars;
   }
 
   const today = ymdInTZ(new Date().getTime(), tz);

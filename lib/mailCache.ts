@@ -14,6 +14,32 @@ import type { InboxMessage, GmailThread } from "@/lib/gmail";
 
 // --- Inbox rows (CachedMessage) ---
 
+type CachedMessageRow = {
+  gmailMessageId: string;
+  threadId: string;
+  fromAddr: string;
+  subject: string;
+  snippet: string;
+  internalDate: bigint;
+  unread: boolean;
+  labelIds: string[];
+  hasListUnsubscribe: boolean;
+};
+
+function rowToInboxMessage(r: CachedMessageRow): InboxMessage {
+  return {
+    id: r.gmailMessageId,
+    threadId: r.threadId,
+    from: r.fromAddr,
+    subject: r.subject,
+    snippet: r.snippet,
+    internalDate: Number(r.internalDate),
+    unread: r.unread,
+    labelIds: r.labelIds,
+    hasListUnsubscribe: r.hasListUnsubscribe,
+  };
+}
+
 /** Read cached inbox rows for the given gmail message ids, keyed by id. */
 export async function getCachedMessages(
   userId: string,
@@ -25,19 +51,80 @@ export async function getCachedMessages(
   });
   const map = new Map<string, InboxMessage>();
   for (const r of rows) {
-    map.set(r.gmailMessageId, {
-      id: r.gmailMessageId,
-      threadId: r.threadId,
-      from: r.fromAddr,
-      subject: r.subject,
-      snippet: r.snippet,
-      internalDate: Number(r.internalDate),
-      unread: r.unread,
-      labelIds: r.labelIds,
-      hasListUnsubscribe: r.hasListUnsubscribe,
-    });
+    map.set(r.gmailMessageId, rowToInboxMessage(r));
   }
   return map;
+}
+
+type CachedMessageWhere = NonNullable<Parameters<typeof prisma.cachedMessage.findMany>[0]>["where"];
+
+/**
+ * Read a page of the cached inbox for a folder/label view, entirely from
+ * Postgres — no Corsair call. `labelIds` empty/undefined means "all mail"
+ * (TRASH/SPAM excluded unless explicitly requested via `labelIds`).
+ */
+export async function listCachedInbox(
+  userId: string,
+  opts: { labelIds?: string[]; unreadOnly?: boolean; limit: number; offset: number },
+): Promise<{ messages: InboxMessage[]; total: number }> {
+  const { labelIds, unreadOnly, limit, offset } = opts;
+  const where: CachedMessageWhere = {
+    userId,
+    ...(unreadOnly ? { unread: true } : {}),
+    ...(labelIds && labelIds.length > 0
+      ? { labelIds: { hasEvery: labelIds } }
+      : { NOT: [{ labelIds: { has: "TRASH" } }, { labelIds: { has: "SPAM" } }] }),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.cachedMessage.findMany({
+      where,
+      orderBy: { internalDate: "desc" },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.cachedMessage.count({ where }),
+  ]);
+  return { messages: rows.map(rowToInboxMessage), total };
+}
+
+/**
+ * Drop `labelId` from cached rows that carry it but are no longer present in
+ * a fresh live list of that label's top messages — e.g. mail archived/deleted
+ * outside the app. Only inspects the cached rows within the live window so it
+ * never touches older mail the live call didn't cover. Best-effort.
+ */
+export async function reconcileInboxWindow(
+  userId: string,
+  labelId: string,
+  liveIds: string[],
+): Promise<void> {
+  const windowRows = await prisma.cachedMessage
+    .findMany({
+      where: { userId, labelIds: { has: labelId } },
+      orderBy: { internalDate: "desc" },
+      take: 25,
+      select: { gmailMessageId: true, labelIds: true },
+    })
+    .catch(() => []);
+  const live = new Set(liveIds);
+  const stale = windowRows.filter((r) => !live.has(r.gmailMessageId));
+  if (stale.length === 0) return;
+
+  await Promise.all(
+    stale.map((r) => {
+      const nextLabels = r.labelIds.filter((l) => l !== labelId);
+      return nextLabels.length === 0
+        ? prisma.cachedMessage
+            .deleteMany({ where: { userId, gmailMessageId: r.gmailMessageId } })
+            .catch(() => {})
+        : prisma.cachedMessage
+            .update({
+              where: { userId_gmailMessageId: { userId, gmailMessageId: r.gmailMessageId } },
+              data: { labelIds: nextLabels },
+            })
+            .catch(() => {});
+    }),
+  );
 }
 
 /** Upsert hydrated inbox rows into the cache (best-effort, never throws). */
@@ -175,6 +262,39 @@ export async function dropCachedThread(
 ): Promise<void> {
   await prisma.cachedThread
     .deleteMany({ where: { userId, threadId } })
+    .catch(() => {});
+}
+
+// --- Sidebar label data (CachedLabelData) ---
+
+export type LabelData = {
+  custom: { id: string; name: string; unread: number }[];
+  unread: Record<string, number>;
+};
+
+const LABEL_STALE_MS = 5 * 60_000;
+
+export type CachedLabelDataHit = { data: LabelData; fetchedAt: Date; stale: boolean };
+
+/** Read cached sidebar label data (with staleness flag) or null on miss. */
+export async function getCachedLabelData(userId: string): Promise<CachedLabelDataHit | null> {
+  const row = await prisma.cachedLabelData.findUnique({ where: { userId } }).catch(() => null);
+  if (!row) return null;
+  return {
+    data: row.data as unknown as LabelData,
+    fetchedAt: row.fetchedAt,
+    stale: nowMs() - row.fetchedAt.getTime() > LABEL_STALE_MS,
+  };
+}
+
+/** Store/refresh the sidebar label data. */
+export async function putCachedLabelData(userId: string, data: LabelData): Promise<void> {
+  await prisma.cachedLabelData
+    .upsert({
+      where: { userId },
+      create: { userId, data: data as object, fetchedAt: nowDate() },
+      update: { data: data as object, fetchedAt: nowDate() },
+    })
     .catch(() => {});
 }
 

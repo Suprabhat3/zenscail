@@ -7,6 +7,8 @@ import {
   putCachedMessages,
   getCachedThread,
   putCachedThread,
+  getCachedLabelData,
+  putCachedLabelData,
 } from "@/lib/mailCache";
 
 // --- Gmail API payload types (subset we use) ---
@@ -400,6 +402,30 @@ export async function getLabelData(
     .map((l) => ({ id: l.id, name: l.name, unread: l.messagesUnread ?? 0 }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return { custom, unread };
+}
+
+/**
+ * Cache-first sidebar label data. On a cache hit we return the stored payload
+ * instantly (kicking a non-blocking `after()` refresh if stale); on a cold
+ * cache (first visit) we fetch live and persist so the next render is instant.
+ */
+export async function getLabelDataCached(
+  t: TenantScope,
+  userId: string,
+): Promise<{ custom: GmailLabel[]; unread: Record<string, number> }> {
+  const hit = await getCachedLabelData(userId).catch(() => null);
+  if (hit) {
+    if (hit.stale) {
+      after(async () => {
+        const fresh = await getLabelData(t).catch(() => null);
+        if (fresh) await putCachedLabelData(userId, fresh);
+      });
+    }
+    return hit.data;
+  }
+  const fresh = await getLabelData(t);
+  await putCachedLabelData(userId, fresh).catch(() => {});
+  return fresh;
 }
 
 /** Extract an email address from a header value like `"Jo" <jo@x.com>`. */

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import type { InboxMessage } from "@/lib/gmail";
 import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
-import { listInboxMessages, getThread, header, getLabelData } from "@/lib/gmail";
+import { listInboxMessages, getLabelDataCached } from "@/lib/gmail";
+import { listCachedInbox, reconcileInboxWindow } from "@/lib/mailCache";
 import { MailSidebar, MailFolderChips } from "@/components/mail/MailSidebar";
 import { MailNavProvider, MailBody } from "@/components/mail/MailNav";
 import {
@@ -16,6 +18,7 @@ import {
   type Priority,
   type Category,
 } from "@/lib/ai/classify";
+import { summarizeMessages } from "@/lib/ai/summary";
 import { PriorityBadge } from "@/components/mail/PriorityBadge";
 import { HoverSummary } from "@/components/mail/HoverSummary";
 import { SenderAvatar, parseSender } from "@/components/mail/SenderAvatar";
@@ -31,6 +34,34 @@ import { catchUpSchedules } from "./schedule-actions";
 import { processDueFollowUps, listSurfacedFollowUps } from "@/lib/followUp";
 import { getUserTimeZone, formatInTZ, ymdInTZ } from "@/lib/timezone";
 import { isDemoMode, getDemoMessages, getDemoPriorities, DEMO_USER } from "@/lib/demo";
+
+// Deep-page safety cap for the rare case a user pages far beyond what's
+// cached — each page beyond the cache walks one more live Gmail cursor hop.
+const MAX_PAGE_NUMBER = 20;
+
+/**
+ * Rare-path fallback for paging deeper than the local cache covers: walk
+ * Gmail's opaque cursor from page 1 up to `targetPage`. Bounded and slow by
+ * design — normal browsing never hits this because the background refresh
+ * keeps the first page warm.
+ */
+async function fetchLivePage(
+  t: ReturnType<typeof corsairTenant>,
+  opts: { labelIds?: string[]; includeSpamTrash?: boolean; userId: string },
+  targetPage: number,
+): Promise<{ ok: boolean; messages: InboxMessage[] }> {
+  let pageToken: string | undefined;
+  let result: Awaited<ReturnType<typeof listInboxMessages>> = { ok: true, messages: [] };
+  for (let page = 1; page <= targetPage; page++) {
+    result = await listInboxMessages(t, { ...opts, limit: PAGE_SIZE, pageToken });
+    if (!result.ok) return result;
+    if (page < targetPage) {
+      if (!result.nextPageToken) return { ok: true, messages: [] };
+      pageToken = result.nextPageToken;
+    }
+  }
+  return result;
+}
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, low: 2 };
 
@@ -119,10 +150,6 @@ export default async function MailPage({
   }>;
 }) {
   const { q, view, folder: folderParam, label: labelId, pg } = await searchParams;
-  const tokenStack = decodeTokenStack(pg);
-  const pageToken = tokenStack.length > 0 ? tokenStack[tokenStack.length - 1] : undefined;
-  const pageNumber = tokenStack.length + 1;
-  const firstPage = tokenStack.length === 0;
   const urgentFirst = view === "urgent";
   const unreadView = q === UNREAD_QUERY;
   const snoozedView = view === "snoozed";
@@ -136,6 +163,21 @@ export default async function MailPage({
   const userId = session?.user.id ?? DEMO_USER.id;
   let t: ReturnType<typeof corsairTenant> | null = null;
   if (!demo) t = corsairTenant(await ensureCorsairTenant(userId));
+
+  // A real text search still hits Corsair live (we don't index bodies).
+  // Everything else — inbox/folders/labels/unread — renders from Postgres.
+  const isSearch = Boolean(q) && !unreadView;
+  const isCachedListView = !demo && !snoozedView && !scheduledView && !isSearch;
+
+  // Pagination: search keeps Gmail's opaque cursor stack; cached views use a
+  // plain DB offset (page number), capped so a crafted deep page can't trigger
+  // an unbounded live cursor walk (see fetchLivePage).
+  const tokenStack = isSearch ? decodeTokenStack(pg) : [];
+  const pageToken = tokenStack.length > 0 ? tokenStack[tokenStack.length - 1] : undefined;
+  const pageNumber = isSearch
+    ? tokenStack.length + 1
+    : Math.min(Math.max(1, Math.trunc(Number(pg)) || 1), MAX_PAGE_NUMBER);
+  const firstPage = pageNumber === 1;
 
   const showFollowUps = !snoozedView && !scheduledView;
 
@@ -155,7 +197,7 @@ export default async function MailPage({
   const [labelData, layoutCookie, tz, surfacedFollowUps] = await Promise.all([
     demo
       ? Promise.resolve({ custom: [], unread: {} })
-      : getLabelData(t!).catch(() => ({ custom: [], unread: {} })),
+      : getLabelDataCached(t!, userId).catch(() => ({ custom: [], unread: {} })),
     cookies(),
     getUserTimeZone(),
     !demo && showFollowUps ? listSurfacedFollowUps(userId).catch(() => []) : Promise.resolve([]),
@@ -193,6 +235,8 @@ export default async function MailPage({
             : folder.title;
 
   // --- Snoozed view ---
+  // Subject/snippet come from the local mail cache (indexed by threadId), not
+  // a live per-row getThread() call — that N+1 was the slowest part of this view.
   let snoozed: { threadId: string; subject: string; snippet: string; until: Date }[] = [];
   if (snoozedView && !demo) {
     const rows = await prisma.snoozedThread.findMany({
@@ -200,18 +244,24 @@ export default async function MailPage({
       orderBy: { snoozeUntil: "asc" },
       take: 50,
     });
-    snoozed = await Promise.all(
-      rows.map(async (r) => {
-        const res = await getThread(t!, r.threadId).catch(() => null);
-        const first = res?.success ? res.data.messages?.[0] : undefined;
-        return {
-          threadId: r.threadId,
-          subject: header(first?.payload, "Subject") || "(no subject)",
-          snippet: res?.success ? res.data.snippet ?? "" : "",
-          until: r.snoozeUntil,
-        };
-      }),
-    );
+    const cachedRows = await prisma.cachedMessage.findMany({
+      where: { userId, threadId: { in: rows.map((r) => r.threadId) } },
+      orderBy: { internalDate: "desc" },
+      select: { threadId: true, subject: true, snippet: true },
+    });
+    const byThread = new Map<string, { subject: string; snippet: string }>();
+    for (const c of cachedRows) {
+      if (!byThread.has(c.threadId)) byThread.set(c.threadId, c);
+    }
+    snoozed = rows.map((r) => {
+      const cached = byThread.get(r.threadId);
+      return {
+        threadId: r.threadId,
+        subject: cached?.subject || "(snoozed thread)",
+        snippet: cached?.snippet ?? "",
+        until: r.snoozeUntil,
+      };
+    });
   }
 
   // --- Scheduled (outbox) view ---
@@ -257,24 +307,80 @@ export default async function MailPage({
   }
 
   // --- Inbox / search view ---
-  let messages: Awaited<ReturnType<typeof listInboxMessages>>["messages"] = [];
+  let messages: InboxMessage[] = [];
   let priorities = new Map<string, RowMeta>();
   let nextPageToken: string | undefined;
   if (demo) {
     messages = getDemoMessages();
     priorities = getDemoPriorities();
-  } else if (!snoozedView && !scheduledView) {
-    const listOpts = q
-      ? { query: q, limit: PAGE_SIZE, userId, pageToken }
-      : labelId
-        ? { labelIds: [labelId], limit: PAGE_SIZE, userId, pageToken }
-        : { labelIds: folder.labelIds, includeSpamTrash: folder.includeSpamTrash, limit: PAGE_SIZE, userId, pageToken };
-    const result = await listInboxMessages(t!, listOpts);
+  } else if (isSearch) {
+    // Search isn't cached (we don't index bodies) — still a live Corsair call.
+    const result = await listInboxMessages(t!, { query: q, limit: PAGE_SIZE, userId, pageToken });
     if (!result.ok) redirect("/connect");
     messages = result.messages;
     nextPageToken = result.nextPageToken;
-
     await classifyMessages(userId, messages);
+  } else if (isCachedListView) {
+    const listLabelIds = unreadView ? ["INBOX"] : labelId ? [labelId] : folder.labelIds;
+    const includeSpamTrash = !labelId ? folder.includeSpamTrash : undefined;
+    const offset = (pageNumber - 1) * PAGE_SIZE;
+    const cached = await listCachedInbox(userId, {
+      labelIds: listLabelIds,
+      unreadOnly: unreadView,
+      limit: PAGE_SIZE,
+      offset,
+    });
+
+    if (cached.messages.length > 0) {
+      messages = cached.messages;
+    } else if (firstPage) {
+      // Cold start (brand-new user, nothing cached yet): one blocking live
+      // fetch, which warms CachedMessage so every later render is instant.
+      const result = await listInboxMessages(t!, {
+        labelIds: listLabelIds,
+        includeSpamTrash,
+        limit: PAGE_SIZE,
+        userId,
+      });
+      if (!result.ok) redirect("/connect");
+      messages = result.messages;
+    } else {
+      // Paged deeper than the cache covers — rare; walk Gmail's cursor live.
+      const result = await fetchLivePage(t!, { labelIds: listLabelIds, includeSpamTrash, userId }, pageNumber);
+      if (!result.ok) redirect("/connect");
+      messages = result.messages;
+    }
+
+    // Background refresh: re-list live (warms the cache + reconciles archived/
+    // deleted mail), then classify + summarize — all off the render path.
+    if (firstPage) {
+      after(async () => {
+        try {
+          const live = await listInboxMessages(t!, {
+            userId,
+            limit: PAGE_SIZE,
+            labelIds: listLabelIds,
+            includeSpamTrash,
+          });
+          if (live.ok) {
+            if (listLabelIds && listLabelIds.length === 1) {
+              await reconcileInboxWindow(
+                userId,
+                listLabelIds[0],
+                live.messages.map((m) => m.id),
+              );
+            }
+            await classifyMessages(userId, live.messages);
+            await summarizeMessages(userId, t!, live.messages, { limit: PAGE_SIZE });
+          }
+        } catch {
+          // best-effort — the next background pass or client poll retries
+        }
+      });
+    }
+  }
+
+  if (!demo && (isSearch || isCachedListView)) {
     priorities = await getPriorities(
       userId,
       messages.map((m) => m.id).filter((id): id is string => Boolean(id)),
@@ -326,21 +432,40 @@ export default async function MailPage({
           pageNumber > 1 ? ` · page ${pageNumber}` : ""
         }${unreadCount > 0 && !unreadView ? ` · ${unreadCount} unread` : ""}`;
 
-  // Cursor pagination links (Gmail-backed lists only). "Newer" pops the token
-  // stack, "Older" pushes the next cursor; both preserve the active view/query.
+  // Pagination links. Search keeps Gmail's cursor stack ("Newer" pops it,
+  // "Older" pushes the next cursor); cached views use a plain page number.
   const pageParams = new URLSearchParams();
   if (q) pageParams.set("q", q);
   if (view) pageParams.set("view", view);
   if (folderParam) pageParams.set("folder", folderParam);
   if (labelId) pageParams.set("label", labelId);
-  const mkPageHref = (stack: string[]): string => {
+  const mkSearchPageHref = (stack: string[]): string => {
     const p = new URLSearchParams(pageParams);
     if (stack.length > 0) p.set("pg", encodeTokenStack(stack));
     const qs = p.toString();
     return qs ? `/mail?${qs}` : "/mail";
   };
-  const prevHref = !snoozedView && !scheduledView && pageNumber > 1 ? mkPageHref(tokenStack.slice(0, -1)) : null;
-  const nextHref = !snoozedView && !scheduledView && nextPageToken ? mkPageHref([...tokenStack, nextPageToken]) : null;
+  const mkCachedPageHref = (n: number): string => {
+    const p = new URLSearchParams(pageParams);
+    if (n > 1) p.set("pg", String(n));
+    const qs = p.toString();
+    return qs ? `/mail?${qs}` : "/mail";
+  };
+  const hasNext = isSearch
+    ? Boolean(nextPageToken)
+    : messages.length >= PAGE_SIZE && pageNumber < MAX_PAGE_NUMBER;
+  const prevHref =
+    !snoozedView && !scheduledView && pageNumber > 1
+      ? isSearch
+        ? mkSearchPageHref(tokenStack.slice(0, -1))
+        : mkCachedPageHref(pageNumber - 1)
+      : null;
+  const nextHref =
+    !snoozedView && !scheduledView && hasNext
+      ? isSearch
+        ? mkSearchPageHref([...tokenStack, nextPageToken!])
+        : mkCachedPageHref(pageNumber + 1)
+      : null;
 
   return (
     <MailNavProvider>

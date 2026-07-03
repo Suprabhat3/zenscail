@@ -147,7 +147,7 @@ export async function generateDailyBrief(userId: string): Promise<Brief> {
   dayEnd.setDate(dayEnd.getDate() + 1);
 
   const [mail, cal] = await Promise.all([
-    listInboxMessages(t, { query: "in:inbox newer_than:1d", limit: 30 }),
+    listInboxMessages(t, { query: "in:inbox newer_than:1d", limit: 30, userId }),
     listEvents(t, { rangeStart: dayStart, rangeEnd: dayEnd, limit: 25 }),
   ]);
   if (!mail.ok) throw new Error("Gmail not connected");

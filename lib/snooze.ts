@@ -5,6 +5,7 @@ import { corsairTenant } from "@/lib/corsair";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { modifyThread } from "@/lib/gmail";
 import { publish } from "@/lib/realtime";
+import { dropCachedThread } from "@/lib/mailCache";
 
 /**
  * Re-surface every snoozed thread whose time has come: add the INBOX label back
@@ -34,6 +35,7 @@ export async function wakeDueSnoozes(opts: { userId?: string } = {}): Promise<{
       });
       if (!result.success) continue; // leave the row; retry next pass
       await prisma.snoozedThread.delete({ where: { id: row.id } });
+      await dropCachedThread(row.userId, row.threadId);
       publish(row.userId, { plugin: "gmail", type: "snooze-wake", at: Date.now() });
       woken++;
     } catch (err) {

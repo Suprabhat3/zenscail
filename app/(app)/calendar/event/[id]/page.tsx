@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import type { GcalEvent } from "@/lib/gcal";
+import { getCachedEvent, putCachedEvents } from "@/lib/calendarCache";
 import { EventForm } from "@/components/calendar/EventForm";
 import { SubmitButton } from "@/components/app/SubmitButton";
 import { updateEventAction, deleteEventAction } from "../../actions";
@@ -27,9 +28,16 @@ export default async function EditEventPage({
   const tenantId = await ensureCorsairTenant(session.user.id);
   const t = corsairTenant(tenantId);
 
-  const result = await t.run<GcalEvent>("googlecalendar.api.events.get", { id });
-  if (!result.success) notFound();
-  const event = result.data;
+  const cached = await getCachedEvent(session.user.id, id);
+  let event: GcalEvent;
+  if (cached) {
+    event = cached;
+  } else {
+    const result = await t.run<GcalEvent>("googlecalendar.api.events.get", { id });
+    if (!result.success) notFound();
+    event = result.data;
+    await putCachedEvents(session.user.id, [event]);
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">

@@ -147,6 +147,54 @@ model CachedThread {
   @@map("cached_thread")
 }
 
+/// Local cache of the mail sidebar's label data (`getLabelData`'s `{ custom,
+/// unread }` shape) so the sidebar renders from Postgres instead of a live
+/// `labels.list` call. Served stale-while-revalidate like CachedThread.
+model CachedLabelData {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique @map("user_id")
+  data      Json
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@map("cached_label_data")
+}
+
+/// Local content cache for a Google Calendar event, mirroring CachedMessage's
+/// role for mail: `data` holds the full GcalEvent JSON (attendees, description,
+/// htmlLink, …) so the calendar renders without a live `events.getMany` call.
+/// `startMs`/`endMs` are denormalized from `data` for range queries.
+model CachedEvent {
+  id         Int      @id @default(autoincrement())
+  userId     String   @map("user_id")
+  eventId    String   @map("event_id")
+  calendarId String   @default("primary") @map("calendar_id")
+  title      String
+  startMs    BigInt   @map("start_ms")
+  endMs      BigInt   @map("end_ms")
+  isAllDay   Boolean  @map("is_all_day")
+  status     String
+  data       Json
+  fetchedAt  DateTime @default(now()) @map("fetched_at")
+
+  @@unique([userId, eventId])
+  @@index([userId, startMs])
+  @@map("cached_event")
+}
+
+/// Tracks the [syncStartMs, syncEndMs) window currently cached in CachedEvent
+/// for a user, plus the calendar list, so reads know whether a requested range
+/// is covered or needs a live fallback.
+model CalendarSyncState {
+  id            Int      @id @default(autoincrement())
+  userId        String   @unique @map("user_id")
+  calendarsData Json     @map("calendars_data")
+  syncStartMs   BigInt   @map("sync_start_ms")
+  syncEndMs     BigInt   @map("sync_end_ms")
+  fetchedAt     DateTime @map("fetched_at")
+
+  @@map("calendar_sync_state")
+}
+
 /// A newsletter sender the user has unsubscribed from via the Subscriptions
 /// page. Presence of a row = "done" (shown as unsubscribed, excluded from the
 /// active list). `method` records how it was executed; for "link" the user

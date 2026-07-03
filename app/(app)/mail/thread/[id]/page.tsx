@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { requireSession } from "@/lib/session";
 import { getAppIdentityForUser, isFromMe } from "@/lib/identity";
 import { ensureCorsairTenant } from "@/lib/tenant";
@@ -147,6 +149,42 @@ function MessageCard({
   );
 }
 
+/** Skeleton shown while the thread's AI summary streams in. */
+function SummaryBannerSkeleton() {
+  return (
+    <div className="mt-5 animate-pulse overflow-hidden rounded-2xl border border-(--line-soft) bg-(--paper) shadow-(--shadow-card)">
+      <div className="h-9 border-b border-(--line-soft) bg-(--accent-soft)/30" />
+      <div className="space-y-2 px-4 py-3.5">
+        <div className="h-3.5 w-3/4 rounded bg-(--line-soft)" />
+        <div className="h-3 w-1/2 rounded bg-(--line-soft)" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Streams the AI summary in independently of the rest of the thread — the
+ * message bodies paint immediately; this resolves (instantly if pre-generated,
+ * a couple of seconds otherwise) and swaps in behind its own Suspense boundary.
+ */
+async function ThreadSummary({
+  userId,
+  t,
+  messageId,
+}: {
+  userId: string;
+  t: ReturnType<typeof corsairTenant>;
+  messageId: string;
+}) {
+  const summary = await getEmailSummaryFor(userId, t, messageId);
+  if (!summary) return null;
+  return (
+    <div className="mt-5">
+      <SummaryBanner data={summary} />
+    </div>
+  );
+}
+
 export default async function ThreadPage({
   params,
 }: {
@@ -165,18 +203,22 @@ export default async function ThreadPage({
   const messages = thread.messages ?? [];
 
   // Opening a thread marks it read, so it leaves the unread view and the bold
-  // styling in the inbox list. Best-effort — never block the page on it. Mirror
-  // the change into the local cache so the inbox row updates without a re-fetch.
+  // styling in the inbox list. The cache writes are synchronous (so the UI is
+  // immediately consistent); the live Gmail call is best-effort and moved to
+  // after() so it never blocks the page.
   if (messages.some((m) => (m.labelIds ?? []).includes("UNREAD"))) {
     for (const m of messages) {
       if (m.labelIds) m.labelIds = m.labelIds.filter((l) => l !== "UNREAD");
     }
+    const threadId = thread.id ?? id;
     await Promise.all([
-      markThreadRead(t, id).catch(() => {}),
-      markThreadReadInCache(session.user.id, thread.id ?? id),
+      markThreadReadInCache(session.user.id, threadId),
       // Persist the now-read thread so re-opening from cache doesn't re-mark it.
-      putCachedThread(session.user.id, thread.id ?? id, thread),
+      putCachedThread(session.user.id, threadId, thread),
     ]);
+    after(async () => {
+      await markThreadRead(t, id).catch(() => {});
+    });
   }
 
   if (messages.length === 0) {
@@ -203,13 +245,6 @@ export default async function ThreadPage({
   const replyTo =
     header(last?.payload, "Reply-To") ||
     (isFromMe(lastFrom, identity) ? header(last?.payload, "To") : lastFrom);
-
-  // Reuse the summary already generated for the inbox hover card (keyed by the
-  // latest message's gmail id). Best-effort & cached — generates on first open
-  // only if it wasn't pre-generated on arrival.
-  const summary = last?.id
-    ? await getEmailSummaryFor(session.user.id, t, last.id)
-    : null;
 
   const participants = Array.from(
     new Set(messages.map((m) => parseSender(header(m.payload, "From")).name).filter(Boolean)),
@@ -263,11 +298,12 @@ export default async function ThreadPage({
         </Link>
       </div>
 
-      {/* At-a-glance AI summary (reuses the inbox hover summary) */}
-      {summary && (
-        <div className="mt-5">
-          <SummaryBanner data={summary} />
-        </div>
+      {/* At-a-glance AI summary (reuses the inbox hover summary). Streamed in
+          its own Suspense boundary so it never blocks the thread painting. */}
+      {last?.id && (
+        <Suspense fallback={<SummaryBannerSkeleton />}>
+          <ThreadSummary userId={session.user.id} t={t} messageId={last.id} />
+        </Suspense>
       )}
 
       {/* Messages — older ones collapsed, latest expanded */}

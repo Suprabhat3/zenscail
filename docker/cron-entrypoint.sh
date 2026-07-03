@@ -23,6 +23,11 @@ cat > /etc/crontabs/root <<EOF
 
 # Check armed follow-ups and nudge / clear them — hourly
 0 * * * *     curl -fsS --max-time 115 -H "Authorization: Bearer ${CRON_SECRET}" ${APP_URL}/api/cron/follow-ups
+
+# Warm mail + calendar cache for recently active users (backstop for when no
+# tab is open — the 60s client pollers only run while someone is viewing the
+# page) — every 10 min
+*/10 * * * *  curl -fsS --max-time 290 -H "Authorization: Bearer ${CRON_SECRET}" ${APP_URL}/api/cron/sync
 EOF
 
 # -f: foreground, -d 8: log to stderr at debug level (visible in docker logs).

@@ -5,6 +5,7 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { corsairTenant } from "@/lib/corsair";
 import { listInboxMessages } from "@/lib/gmail";
 import { classifyMessages } from "@/lib/ai/classify";
+import { summarizeMessages } from "@/lib/ai/summary";
 
 /**
  * Lightweight inbox sync, called by the client poll (~every 60s) ONLY while the
@@ -29,9 +30,11 @@ export async function pollInbox(): Promise<{ ok: boolean; signature: string }> {
   const { ok, messages } = await listInboxMessages(t, { userId, limit: 25 });
   if (!ok) return { ok: false, signature: "" };
 
-  // Classify new arrivals so priority badges are ready when the view refreshes
-  // (cached per message, so already-seen mail costs nothing).
+  // Classify + summarize new arrivals so priority badges and hover summaries
+  // are ready when the view refreshes (cached per message, so already-seen
+  // mail costs nothing). Fire-and-forget — never block the signature response.
   await classifyMessages(userId, messages).catch(() => {});
+  summarizeMessages(userId, t, messages).catch(() => {});
 
   const unread = messages.filter((m) => m.unread).length;
   const top = messages[0]?.id ?? "";

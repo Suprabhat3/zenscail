@@ -75,15 +75,15 @@ async function generateAndStore(
   const raw = bodies.text || (bodies.html ? htmlToText(bodies.html) : "") || m.snippet || "";
   const body = raw.replace(/\s+\n/g, "\n").slice(0, 6000);
 
-  let model;
+  let cheapModel;
   try {
-    ({ model } = await getModelForUser(userId));
+    ({ cheapModel } = await getModelForUser(userId));
   } catch {
     return null;
   }
 
   const { object } = await generateObject({
-    model,
+    model: cheapModel,
     schema: SummarySchema,
     system: SYSTEM,
     prompt: `From: ${from}\nSubject: ${subject}\n\n${body}`,
@@ -132,11 +132,12 @@ export async function getEmailSummaryFor(
  * the mail page, so past emails get backfilled, not just new ones). Skips
  * messages already summarized.
  *
- * For efficiency we skip low-priority mail (newsletters, marketing, social,
- * automated notifications) — the user is unlikely to open it, so proactively
- * summarizing it just burns LLM calls. Hovering such a row still summarizes it
- * lazily via getEmailSummaryFor, which honours that explicit intent. Pass
- * `includeLowPriority` to summarize everything regardless of classification.
+ * Runs on the cheap model (see `generateAndStore`), so by default we summarize
+ * everything shown on the first inbox page — the hover card should be instant
+ * whichever row the user lands on. Pass `includeLowPriority: false` to skip
+ * newsletters/marketing/social/automated mail (kept for callers that want the
+ * old cost-conscious behavior); low-priority rows still summarize lazily on
+ * hover either way via `getEmailSummaryFor`.
  *
  * Best-effort and bounded so it never overruns.
  */
@@ -146,7 +147,8 @@ export async function summarizeMessages(
   messages: { id?: string }[],
   opts: { limit?: number; includeLowPriority?: boolean } = {},
 ): Promise<number> {
-  const limit = opts.limit ?? 10;
+  const limit = opts.limit ?? 25;
+  const includeLowPriority = opts.includeLowPriority ?? true;
   const ids = messages.map((m) => m.id).filter((id): id is string => Boolean(id));
   if (ids.length === 0) return 0;
 
@@ -160,7 +162,7 @@ export async function summarizeMessages(
   // Drop mail the user is unlikely to open. Messages with no stored meta are
   // kept (summarize-if-unknown is the safe default — classification may just
   // not have run yet).
-  if (!opts.includeLowPriority && candidates.length > 0) {
+  if (!includeLowPriority && candidates.length > 0) {
     const meta = await getPriorities(userId, candidates);
     candidates = candidates.filter((id) => meta.get(id)?.priority !== "low");
   }

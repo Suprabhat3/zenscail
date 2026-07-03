@@ -16,6 +16,7 @@ import {
   type EventReminder,
   type GcalEventTime,
 } from "@/lib/gcal";
+import { putCachedEvents, dropCachedEvent } from "@/lib/calendarCache";
 import { formCheckbox, parseFormData } from "@/lib/validation";
 
 /** Scalar fields of the event form. Reminder rows (multi-value) are read
@@ -58,11 +59,11 @@ const RECURRENCE_RULES: Record<string, string> = {
 async function tenantForCurrentUser() {
   const session = await requireSession();
   const tenantId = await ensureCorsairTenant(session.user.id);
-  return corsairTenant(tenantId);
+  return { t: corsairTenant(tenantId), userId: session.user.id };
 }
 
 export async function refreshCalendar() {
-  const t = await tenantForCurrentUser();
+  const { t } = await tenantForCurrentUser();
   const now = new Date();
   const result = await refreshEvents(t, {
     timeMin: new Date(now.getTime() - 30 * 86400_000),
@@ -180,7 +181,7 @@ function eventFromForm(formData: FormData): EventInput {
  * user action, so it creates immediately.
  */
 export async function createInstantMeet() {
-  const t = await tenantForCurrentUser();
+  const { t, userId } = await tenantForCurrentUser();
   const now = new Date();
   const end = new Date(now.getTime() + 30 * 60_000);
   const event: EventInput = {
@@ -197,39 +198,39 @@ export async function createInstantMeet() {
   };
   const result = await createEvent(t, event);
   if (!result.success) redirect("/connect");
-  await refreshEvents(t);
+  if (result.data) await putCachedEvents(userId, [result.data]);
   revalidatePath("/calendar");
   const id = result.data?.id;
   redirect(id ? `/calendar/event/${encodeURIComponent(id)}` : "/calendar");
 }
 
 export async function createEventAction(formData: FormData) {
-  const t = await tenantForCurrentUser();
+  const { t, userId } = await tenantForCurrentUser();
   const result = await createEvent(t, eventFromForm(formData));
   if (!result.success) redirect("/connect");
-  // Pull the new event into the cache so it shows up immediately.
-  await refreshEvents(t);
+  // Write the new event straight into the cache so it shows up immediately.
+  if (result.data) await putCachedEvents(userId, [result.data]);
   revalidatePath("/calendar");
   redirect("/calendar");
 }
 
 export async function updateEventAction(formData: FormData) {
-  const t = await tenantForCurrentUser();
+  const { t, userId } = await tenantForCurrentUser();
   const { id } = EventIdSchema.parse(Object.fromEntries(formData.entries()));
   const result = await updateEvent(t, id, eventFromForm(formData));
   if (!result.success) redirect("/connect");
-  await refreshEvents(t);
+  if (result.data) await putCachedEvents(userId, [result.data]);
   revalidatePath("/calendar");
   redirect("/calendar");
 }
 
 export async function deleteEventAction(formData: FormData) {
-  const t = await tenantForCurrentUser();
+  const { t, userId } = await tenantForCurrentUser();
   const parsed = EventIdSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return;
   const result = await deleteEvent(t, parsed.data.id);
   if (!result.success) redirect("/connect");
-  await refreshEvents(t);
+  await dropCachedEvent(userId, parsed.data.id);
   revalidatePath("/calendar");
   redirect("/calendar");
 }

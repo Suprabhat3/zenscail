@@ -1,6 +1,15 @@
 import "server-only";
 
+import { after } from "next/server";
 import type { TenantScope } from "@corsair-dev/app";
+import {
+  getCachedEventsInRange,
+  putCachedEvents,
+  replaceWindow,
+  getSyncState,
+  putSyncState,
+} from "@/lib/calendarCache";
+import { eventStartMillis, eventEndMillis, isAllDay } from "@/lib/gcalTime";
 
 // --- Google Calendar event types (subset we use) ---
 
@@ -67,23 +76,7 @@ function normalizeRows<T>(data: T[] | { results?: T[] } | unknown): T[] {
   return [];
 }
 
-export function eventStartMillis(e: GcalEvent): number {
-  const s = e.start?.dateTime ?? e.start?.date;
-  if (!s) return 0;
-  const d = Date.parse(s);
-  return Number.isNaN(d) ? 0 : d;
-}
-
-export function eventEndMillis(e: GcalEvent): number {
-  const s = e.end?.dateTime ?? e.end?.date;
-  if (!s) return eventStartMillis(e);
-  const d = Date.parse(s);
-  return Number.isNaN(d) ? eventStartMillis(e) : d;
-}
-
-export function isAllDay(e: GcalEvent): boolean {
-  return Boolean(e.start?.date && !e.start?.dateTime);
-}
+export { eventStartMillis, eventEndMillis, isAllDay };
 
 // --- Operations (all take a tenant scope from corsairTenant()) ---
 
@@ -157,6 +150,71 @@ export async function listCalendars(t: TenantScope): Promise<CalendarSummary[]> 
     )
     .map((c) => ({ id: c.id, summary: c.summary, timeZone: c.timeZone }))
     .sort((a, b) => a.summary.localeCompare(b.summary));
+}
+
+// --- DB-first calendar cache (mirrors gmail.ts's cache-first pattern) ---
+
+const SYNC_WINDOW_BEFORE_MS = 30 * 86400_000;
+const SYNC_WINDOW_AFTER_MS = 90 * 86400_000;
+
+/**
+ * Full background sync: pull [-30d, +90d] of events plus the calendar list
+ * live, then replace the cached window in one shot. The single entry point
+ * for keeping CachedEvent warm (first visit, background refresh, poller, cron).
+ */
+export async function syncCalendarWindow(t: TenantScope, userId: string): Promise<boolean> {
+  const now = Date.now();
+  const syncStartMs = now - SYNC_WINDOW_BEFORE_MS;
+  const syncEndMs = now + SYNC_WINDOW_AFTER_MS;
+  const [eventsRes, calendars] = await Promise.all([
+    listEvents(t, { rangeStart: new Date(syncStartMs), rangeEnd: new Date(syncEndMs), limit: 250 }),
+    listCalendars(t).catch(() => []),
+  ]);
+  if (!eventsRes.ok) return false;
+  await replaceWindow(userId, syncStartMs, syncEndMs, eventsRes.messages);
+  await putSyncState(userId, { calendars, syncStartMs, syncEndMs });
+  return true;
+}
+
+/**
+ * Cache-first calendar read for a given visible range. On a cold cache (first
+ * visit) this blocks on one full sync; otherwise it reads Postgres and kicks a
+ * non-blocking background sync when stale. A range outside the synced window
+ * (deep past/future navigation) falls back to one live fetch for that range
+ * without touching the sync window.
+ */
+export async function listEventsCached(
+  t: TenantScope,
+  userId: string,
+  opts: { rangeStart: Date; rangeEnd: Date },
+): Promise<{ ok: boolean; messages: CachedEvent[]; calendars: CalendarSummary[] }> {
+  const rangeStartMs = opts.rangeStart.getTime();
+  const rangeEndMs = opts.rangeEnd.getTime();
+
+  const state = await getSyncState(userId);
+  if (!state) {
+    const ok = await syncCalendarWindow(t, userId);
+    if (!ok) return { ok: false, messages: [], calendars: [] };
+    const fresh = await getSyncState(userId);
+    const messages = await getCachedEventsInRange(userId, rangeStartMs, rangeEndMs);
+    return { ok: true, messages, calendars: fresh?.calendars ?? [] };
+  }
+
+  if (state.stale) {
+    after(async () => {
+      await syncCalendarWindow(t, userId).catch(() => {});
+    });
+  }
+
+  if (rangeStartMs < state.syncStartMs || rangeEndMs > state.syncEndMs) {
+    const live = await listEvents(t, { rangeStart: opts.rangeStart, rangeEnd: opts.rangeEnd });
+    if (!live.ok) return { ok: false, messages: [], calendars: state.calendars };
+    await putCachedEvents(userId, live.messages);
+    return { ok: true, messages: live.messages, calendars: state.calendars };
+  }
+
+  const messages = await getCachedEventsInRange(userId, rangeStartMs, rangeEndMs);
+  return { ok: true, messages, calendars: state.calendars };
 }
 
 /** Pull fresh events from the Google Calendar API into Corsair's cache. */

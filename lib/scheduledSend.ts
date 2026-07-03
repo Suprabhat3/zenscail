@@ -6,6 +6,7 @@ import { ensureCorsairTenant } from "@/lib/tenant";
 import { sendEmail } from "@/lib/gmail";
 import { wrapComposedEmail } from "@/lib/email/render";
 import { publish } from "@/lib/realtime";
+import { dropCachedThread } from "@/lib/mailCache";
 
 /**
  * Core delivery of one scheduled-send row. Idempotent: only acts on rows that
@@ -64,7 +65,9 @@ export async function deliverScheduledSend(id: number): Promise<
         .deleteMany({ where: { scheduledSendId: id } })
         .catch(() => {});
     }
-    // Nudge any open mail view to refresh (the sent message lands in the thread).
+    // Invalidate the cached thread so it re-fetches with the new message, and
+    // nudge any open mail view to refresh.
+    if (row.threadId) await dropCachedThread(row.userId, row.threadId);
     publish(row.userId, { plugin: "gmail", type: "scheduled-send", at: Date.now() });
     return "sent";
   } catch (err) {
