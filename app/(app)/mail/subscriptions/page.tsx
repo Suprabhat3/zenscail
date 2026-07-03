@@ -6,6 +6,7 @@ import { corsairTenant } from "@/lib/corsair";
 import { prisma } from "@/lib/prisma";
 import { listInboxMessages, getLabelData, type InboxMessage } from "@/lib/gmail";
 import { MailSidebar, MailFolderChips } from "@/components/mail/MailSidebar";
+import { MailNavProvider } from "@/components/mail/MailNav";
 import { parseSender } from "@/components/mail/SenderAvatar";
 import {
   SubscriptionsList,
@@ -120,6 +121,7 @@ export default async function SubscriptionsPage() {
   const senders = [...bySender.values()].sort((a, b) => b.count - a.count);
 
   return (
+    <MailNavProvider>
     <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <MailSidebar custom={labelData.custom} unread={labelData.unread} />
       <div className="min-w-0 flex-1">
@@ -187,5 +189,6 @@ export default async function SubscriptionsPage() {
         )}
       </div>
     </div>
+    </MailNavProvider>
   );
 }
